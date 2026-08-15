@@ -34,6 +34,8 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
 
   useEffect(() => {
     if (!user) return
+    let active = true
+
     const fetchNotifs = async () => {
       const { data } = await supabase
         .from('notifications')
@@ -41,7 +43,7 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(20)
-      if (data) {
+      if (data && active) {
         setNotifications(data)
         setUnreadCount(data.filter(n => !n.read).length)
       }
@@ -50,19 +52,23 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
 
     // Realtime subscription
     const channel = supabase
-      .channel('notifications')
+      .channel(`notifications-${user.id}`)
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'notifications',
         filter: `user_id=eq.${user.id}`,
       }, (payload) => {
+        if (!active) return
         setNotifications(prev => [payload.new as Notification, ...prev])
         setUnreadCount(c => c + 1)
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => {
+      active = false
+      supabase.removeChannel(channel)
+    }
   }, [user])
 
   useEffect(() => {
@@ -77,19 +83,20 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
 
   const markAllRead = async () => {
     if (!user) return
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
     await supabase
       .from('notifications')
       .update({ read: true })
       .eq('user_id', user.id)
       .eq('read', false)
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    setUnreadCount(0)
   }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+    const q = searchQuery.trim()
+    if (q) {
+      navigate(`/calendar?search=${encodeURIComponent(q)}`)
       setSearchQuery('')
     }
   }

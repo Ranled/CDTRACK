@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo, memo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
@@ -88,13 +89,17 @@ DayCell.displayName = 'DayCell'
 
 export default function CalendarPage() {
   const { isAdmin } = useAuth()
+  const [searchParams] = useSearchParams()
+  const urlFilter = searchParams.get('filter')
+  const urlSearch = searchParams.get('search')
+
   const [currentDate, setCurrentDate] = useState(new Date())
   const [events, setEvents] = useState<CalEvent[]>([])
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalEvent | null>(null)
-  const [activeFilters, setActiveFilters] = useState<string[]>([])
-  const [showFilters, setShowFilters] = useState(false)
+  const [activeFilters, setActiveFilters] = useState<string[]>(() => urlFilter ? [urlFilter] : [])
+  const [showFilters, setShowFilters] = useState(() => Boolean(urlFilter))
   const [loading, setLoading] = useState(true)
 
   const fetchEvents = useCallback(async () => {
@@ -124,12 +129,17 @@ export default function CalendarPage() {
     return eachDayOfInterval({ start: calStart, end: calEnd })
   }, [currentDate])
 
-  const filteredEvents = useMemo(() =>
-    activeFilters.length > 0
-      ? events.filter(e => activeFilters.includes(e.category))
-      : events,
-    [events, activeFilters]
-  )
+  const filteredEvents = useMemo(() => {
+    let list = events
+    if (activeFilters.length > 0) {
+      list = list.filter(e => activeFilters.includes(e.category))
+    }
+    if (urlSearch) {
+      const q = urlSearch.toLowerCase()
+      list = list.filter(e => e.title.toLowerCase().includes(q) || (e.description && e.description.toLowerCase().includes(q)))
+    }
+    return list
+  }, [events, activeFilters, urlSearch])
 
   const eventsByDay = useMemo(() => {
     const map = new Map<string, CalEvent[]>()
@@ -153,11 +163,10 @@ export default function CalendarPage() {
   }, [])
 
   const handleDeleteEvent = useCallback(async (id: string) => {
-    if (!confirm('Delete this event?')) return
-    await supabase.from('events').delete().eq('id', id)
     setSelectedEvent(null)
-    fetchEvents()
-  }, [fetchEvents])
+    setEvents(prev => prev.filter(e => e.id !== id))
+    await supabase.from('events').delete().eq('id', id)
+  }, [])
 
   const colors = useCallback((cat: string) => CATEGORY_COLORS[cat] || CATEGORY_COLORS['custom'], [])
   const dotColor = useCallback((cat: string) => CATEGORY_DOT_COLORS[cat] || '#6B7280', [])
@@ -167,7 +176,11 @@ export default function CalendarPage() {
   const handleOpenCreate = useCallback(() => { setEditingEvent(null); setShowForm(true) }, [])
   const handleOpenEdit = useCallback(() => { setEditingEvent(selectedEvent); setShowForm(true) }, [selectedEvent])
   const handleFormClose = useCallback(() => { setShowForm(false); setEditingEvent(null) }, [])
-  const handleFormSave = useCallback(() => { setShowForm(false); setEditingEvent(null); fetchEvents() }, [fetchEvents])
+  const handleFormSave = useCallback(() => {
+    setShowForm(false)
+    setEditingEvent(null)
+    fetchEvents()
+  }, [fetchEvents])
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">

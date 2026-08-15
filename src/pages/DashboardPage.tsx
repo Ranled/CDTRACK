@@ -55,32 +55,60 @@ function ProgressRing({ percent, size = 140, strokeWidth = 10 }: ProgressRingPro
   )
 }
 
+// In-memory module cache to prevent spinner flashes on tab navigation
+let cachedDashboardData: {
+  todayEvents: Event[]
+  upcomingDeadlines: Event[]
+  allEvents: Event[]
+  announcements: Announcement[]
+  timestamp: number
+} | null = null
+
 export default function DashboardPage() {
   const { profile, user, isAdmin } = useAuth()
   const navigate = useNavigate()
 
-  const [todayEvents, setTodayEvents] = useState<Event[]>([])
-  const [upcomingDeadlines, setUpcomingDeadlines] = useState<Event[]>([])
-  const [allEvents, setAllEvents] = useState<Event[]>([])
-  const [announcements, setAnnouncements] = useState<Announcement[]>([])
-  const [loading, setLoading] = useState(true)
+  const [todayEvents, setTodayEvents] = useState<Event[]>(() => cachedDashboardData?.todayEvents || [])
+  const [upcomingDeadlines, setUpcomingDeadlines] = useState<Event[]>(() => cachedDashboardData?.upcomingDeadlines || [])
+  const [allEvents, setAllEvents] = useState<Event[]>(() => cachedDashboardData?.allEvents || [])
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() => cachedDashboardData?.announcements || [])
+  const [loading, setLoading] = useState(() => !cachedDashboardData)
 
   const fetchData = useCallback(async () => {
-    setLoading(true)
+    // Only show full loading spinner if we don't have any cached data
+    if (!cachedDashboardData) {
+      setLoading(true)
+    }
     const today = format(new Date(), 'yyyy-MM-dd')
 
-    const [eventsRes, deadlinesRes, allEventsRes, announcementsRes] = await Promise.all([
-      supabase.from('events').select('*').eq('date', today).order('time', { ascending: true }),
-      supabase.from('events').select('*').in('category', ['deadline', 'exam', 'assignment']).gte('date', today).order('date', { ascending: true }).limit(5),
-      supabase.from('events').select('*').gte('date', format(new Date(Date.now() - 30 * 86400000), 'yyyy-MM-dd')),
-      supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(3),
-    ])
+    try {
+      const [eventsRes, deadlinesRes, allEventsRes, announcementsRes] = await Promise.all([
+        supabase.from('events').select('*').eq('date', today).order('time', { ascending: true }),
+        supabase.from('events').select('*').in('category', ['deadline', 'exam', 'assignment']).gte('date', today).order('date', { ascending: true }).limit(5),
+        supabase.from('events').select('*').gte('date', format(new Date(Date.now() - 30 * 86400000), 'yyyy-MM-dd')),
+        supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(3),
+      ])
 
-    setTodayEvents(eventsRes.data || [])
-    setUpcomingDeadlines(deadlinesRes.data || [])
-    setAllEvents(allEventsRes.data || [])
-    setAnnouncements(announcementsRes.data || [])
-    setLoading(false)
+      const newToday = eventsRes.data || []
+      const newDeadlines = deadlinesRes.data || []
+      const newAll = allEventsRes.data || []
+      const newAnnouncements = announcementsRes.data || []
+
+      cachedDashboardData = {
+        todayEvents: newToday,
+        upcomingDeadlines: newDeadlines,
+        allEvents: newAll,
+        announcements: newAnnouncements,
+        timestamp: Date.now(),
+      }
+
+      setTodayEvents(newToday)
+      setUpcomingDeadlines(newDeadlines)
+      setAllEvents(newAll)
+      setAnnouncements(newAnnouncements)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
