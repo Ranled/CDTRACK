@@ -90,7 +90,7 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
               'text-[10px] font-medium mt-0.5',
               isAdmin ? 'text-primary' : 'text-muted-foreground'
             )}>
-              {isAdmin ? '⭐ Administrator' : 'Member'}
+              {isAdmin ? 'Administrator' : 'Member'}
             </div>
           </div>
         )}

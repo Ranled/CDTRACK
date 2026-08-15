@@ -94,13 +94,13 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
     }
   }
 
-  const notifTypeIcon: Record<string, string> = {
-    announcement: '📢',
-    deadline: '⏰',
-    event: '📅',
-    assignment: '📝',
-    reminder: '🔔',
-    general: '💬',
+  const notifTypeDot: Record<string, string> = {
+    announcement: 'bg-yellow-400',
+    deadline: 'bg-red-400',
+    event: 'bg-blue-400',
+    assignment: 'bg-orange-400',
+    reminder: 'bg-purple-400',
+    general: 'bg-gray-400',
   }
 
   return (
@@ -189,8 +189,8 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
                       )}
                     >
                       <div className="flex items-start gap-3">
-                        <span className="text-base flex-shrink-0 mt-0.5">
-                          {notifTypeIcon[notif.type] || '💬'}
+                        <span className="flex-shrink-0 mt-1">
+                          <span className={`w-2 h-2 rounded-full block ${notifTypeDot[notif.type] || 'bg-gray-400'}`} />
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
