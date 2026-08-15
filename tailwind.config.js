@@ -10,17 +10,17 @@ export default {
       colors: {
         // CD TRACK design tokens
         primary: {
-          DEFAULT: '#2563EB',
-          50: '#EFF6FF',
-          100: '#DBEAFE',
-          200: '#BFDBFE',
-          300: '#93C5FD',
-          400: '#60A5FA',
-          500: '#3B82F6',
-          600: '#2563EB',
-          700: '#1D4ED8',
-          800: '#1E40AF',
-          900: '#1E3A8A',
+          DEFAULT: '#1B3A7A',
+          50: '#EEF2FA',
+          100: '#D5DFEE',
+          200: '#ABBFDD',
+          300: '#7296C7',
+          400: '#4470B0',
+          500: '#2553A0',
+          600: '#1B3A7A',
+          700: '#152F65',
+          800: '#0F2249',
+          900: '#0a1628',
           foreground: '#FFFFFF',
         },
         accent: {
@@ -35,7 +35,7 @@ export default {
         },
         border: '#E5E7EB',
         input: '#E5E7EB',
-        ring: '#2563EB',
+        ring: '#1B3A7A',
         muted: {
           DEFAULT: '#F9FAFB',
           foreground: '#6B7280',

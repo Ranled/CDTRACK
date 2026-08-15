@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import { Key, LogIn } from 'lucide-react'
+import { Key, LogIn, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const { signInWithCode } = useAuth()
@@ -21,103 +21,72 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Left Panel — Branding */}
-      <div className="hidden lg:flex lg:w-[52%] bg-primary flex-col justify-between p-12 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-white/5 translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 left-0 w-48 h-48 rounded-full bg-white/5 -translate-x-1/2 translate-y-1/2" />
-        <div className="absolute top-1/2 right-8 w-32 h-32 rounded-full bg-white/5" />
+    <div className="min-h-screen flex flex-col items-center justify-center relative overflow-hidden bg-[#0a1628]">
 
-        {/* Logo */}
-        <div className="relative z-10">
-          <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Code Dreamers" className="w-14 h-14 object-contain rounded-xl bg-white/10 p-1" />
-            <div>
-              <div className="text-white font-bold text-xl tracking-tight">CD TRACK</div>
-              <div className="text-white/60 text-sm">Academic Tracking System</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Center content */}
-        <div className="relative z-10 space-y-6">
-          <div className="space-y-3">
-            <h1 className="text-white font-bold text-4xl leading-tight">
-              Stay organized.<br />Stay on track.
-            </h1>
-            <p className="text-white/70 text-lg leading-relaxed max-w-sm">
-              Your centralized platform for managing academic activities, deadlines, projects, and organization events.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              'Track deadlines and assignments',
-              'Manage organization events',
-              'Collaborate with your team',
-              'Never miss a thesis milestone',
-            ].map(feature => (
-              <div key={feature} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
-                  <svg className="w-3 h-3 text-yellow-900" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <span className="text-white/80 text-sm">{feature}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="relative z-10 text-white/40 text-xs">
-          © 2025 Code Dreamers. All rights reserved.
-        </div>
+      {/* Subtle background orbs */}
+      <div className="absolute inset-0 pointer-events-none select-none">
+        <div className="absolute top-[-10%] left-[-5%] w-[500px] h-[500px] rounded-full bg-[#1B3A7A]/30 blur-[120px]" />
+        <div className="absolute bottom-[-10%] right-[-5%] w-[400px] h-[400px] rounded-full bg-[#0F2C6F]/40 blur-[100px]" />
+        <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[300px] h-[300px] rounded-full bg-[#FACC15]/5 blur-[80px]" />
       </div>
 
-      {/* Right Panel — Login Form */}
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-16">
-        <div className="w-full max-w-md animate-fade-in">
-          {/* Mobile logo */}
-          <div className="flex lg:hidden items-center gap-3 mb-8 justify-center">
-            <img src="/logo.png" alt="Code Dreamers" className="w-12 h-12 object-contain" />
-            <div>
-              <div className="font-bold text-lg text-foreground">CD TRACK</div>
-              <div className="text-muted-foreground text-xs">Academic Tracking System</div>
+      {/* Card */}
+      <div className="relative z-10 w-full max-w-md mx-auto px-6 animate-fade-in">
+
+        {/* Logo + Heading */}
+        <div className="flex flex-col items-center text-center mb-10 space-y-4">
+          <div className="relative">
+            <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_0_40px_rgba(27,58,122,0.5)]">
+              <img
+                src="/logo.png"
+                alt="CD TRACK"
+                className="w-14 h-14 object-contain"
+              />
             </div>
           </div>
 
-          <div className="space-y-2 mb-8">
-            <h2 className="text-2xl font-bold text-foreground">Enter Access Code</h2>
-            <p className="text-muted-foreground text-sm">
-              Use your organization access code to enter.
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold tracking-tight text-white">CD TRACK</h1>
+            <p className="text-sm text-white/50 tracking-widest uppercase font-medium">
+              Academic Tracking System
+            </p>
+          </div>
+        </div>
+
+        {/* Form card */}
+        <div className="bg-white/5 border border-white/10 rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
+          <div className="mb-6 space-y-1">
+            <h2 className="text-lg font-semibold text-white">Enter Access Code</h2>
+            <p className="text-sm text-white/50">
+              Enter your assigned access code to continue.
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Access Code */}
+            {/* Access Code Input */}
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">Access Code</label>
+              <label className="text-xs font-semibold text-white/60 uppercase tracking-wider">
+                Access Code
+              </label>
               <div className="relative">
-                <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Key className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                 <input
                   type="text"
                   value={code}
                   onChange={e => setCode(e.target.value.toUpperCase())}
-                  placeholder="Enter your access code"
-                  className="cd-input pl-10 font-mono tracking-widest uppercase"
+                  placeholder="••••••••"
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/8 border border-white/10 text-white placeholder:text-white/20 font-mono tracking-widest uppercase text-sm focus:outline-none focus:ring-2 focus:ring-[#FACC15]/40 focus:border-[#FACC15]/40 transition-all duration-200"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.06)' }}
                   required
                   autoComplete="off"
                   autoFocus
                 />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Members: <span className="font-mono font-medium">CD01</span> &nbsp;·&nbsp; Administrators: <span className="font-mono font-medium">CDADMIN01</span>
-              </p>
             </div>
 
             {/* Error */}
             {error && (
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm animate-fade-in">
+              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in">
                 {error}
               </div>
             )}
@@ -125,17 +94,31 @@ export default function LoginPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg font-medium text-sm hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+              disabled={loading || !code.trim()}
+              className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-[#FACC15] text-[#0a1628] rounded-xl font-semibold text-sm hover:bg-[#F59E0B] active:scale-[0.98] transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed mt-2 shadow-[0_4px_20px_rgba(250,204,21,0.25)]"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <><LogIn className="w-4 h-4" /> Enter</>
+                <>
+                  <LogIn className="w-4 h-4" />
+                  Enter
+                </>
               )}
             </button>
           </form>
         </div>
+
+        {/* Footer */}
+        <div className="mt-8 text-center space-y-1">
+          <p className="text-xs text-white/25">
+            © 2026 All Rights Reserved
+          </p>
+          <p className="text-xs text-white/20">
+            Developed by <span className="text-white/40 font-medium">Raian Lee D. Vallejo</span>
+          </p>
+        </div>
+
       </div>
     </div>
   )
