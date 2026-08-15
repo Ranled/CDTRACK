@@ -8,9 +8,10 @@ export default {
   theme: {
     extend: {
       colors: {
-        // CD TRACK design tokens
+        // CD TRACK design tokens mapped to CSS variables for dynamic Dark Mode support
         primary: {
-          DEFAULT: '#1B3A7A',
+          DEFAULT: 'hsl(var(--primary))',
+          foreground: 'hsl(var(--primary-foreground))',
           50: '#EEF2FA',
           100: '#D5DFEE',
           200: '#ABBFDD',
@@ -21,32 +22,35 @@ export default {
           700: '#152F65',
           800: '#0F2249',
           900: '#0a1628',
-          foreground: '#FFFFFF',
         },
         accent: {
-          DEFAULT: '#FACC15',
-          foreground: '#111827',
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
         },
-        background: '#FFFFFF',
-        foreground: '#111827',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
         card: {
-          DEFAULT: '#FCFCFC',
-          foreground: '#111827',
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
         },
-        border: '#E5E7EB',
-        input: '#E5E7EB',
-        ring: '#1B3A7A',
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
         muted: {
-          DEFAULT: '#F9FAFB',
-          foreground: '#6B7280',
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
         },
         secondary: {
-          DEFAULT: '#F3F4F6',
-          foreground: '#111827',
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
         },
         destructive: {
-          DEFAULT: '#DC2626',
-          foreground: '#FFFFFF',
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
         },
         success: '#16A34A',
         warning: '#F59E0B',

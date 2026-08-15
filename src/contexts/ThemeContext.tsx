@@ -21,8 +21,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const root = document.documentElement
     if (theme === 'dark') {
       root.classList.add('dark')
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a')
     } else {
       root.classList.remove('dark')
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#1B3A7A')
     }
     localStorage.setItem('cd-track-theme', theme)
   }, [theme])
