@@ -100,14 +100,17 @@ export default function CalendarPage() {
   const fetchEvents = useCallback(async () => {
     const start = format(startOfMonth(currentDate), 'yyyy-MM-dd')
     const end = format(endOfMonth(currentDate), 'yyyy-MM-dd')
-    const { data } = await supabase
-      .from('events')
-      .select('*')
-      .gte('date', start)
-      .lte('date', end)
-      .order('time', { ascending: true })
-    setEvents(data || [])
-    setLoading(false)
+    try {
+      const { data } = await supabase
+        .from('events')
+        .select('*')
+        .gte('date', start)
+        .lte('date', end)
+        .order('time', { ascending: true })
+      setEvents(data || [])
+    } finally {
+      setLoading(false)
+    }
   }, [currentDate])
 
   useEffect(() => { fetchEvents() }, [fetchEvents])

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.events (
   title TEXT NOT NULL,
   description TEXT,
   category TEXT NOT NULL DEFAULT 'event',
+  course TEXT,
   date DATE NOT NULL,
   time TIME,
   end_time TIME,
@@ -244,6 +245,11 @@ CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON public.announcements(is_p
 -- MIGRATION: Add email column to profiles (safe for existing DBs)
 -- ================================================
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS email TEXT;
+
+-- ================================================
+-- MIGRATION: Add course column to events (safe for existing DBs)
+-- ================================================
+ALTER TABLE public.events ADD COLUMN IF NOT EXISTS course TEXT;
 
 -- ================================================
 -- DONE!

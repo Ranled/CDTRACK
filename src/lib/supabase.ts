@@ -33,6 +33,7 @@ export type Database = {
           title: string
           description: string | null
           category: string
+          course: string | null
           date: string
           time: string | null
           end_time: string | null

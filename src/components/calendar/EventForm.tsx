@@ -1,4 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
+import ReactDOM from 'react-dom'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { X, Calendar, Clock, MapPin, Save, Loader2 } from 'lucide-react'
@@ -6,7 +7,7 @@ import { ALL_CATEGORIES } from '@/lib/utils'
 
 const COURSES = ['OS101', 'HCI101', 'SP101', 'NC101', 'THS102']
 
-interface Event {
+interface EventData {
   id?: string
   title: string
   description: string | null
@@ -21,119 +22,229 @@ interface Event {
 }
 
 interface EventFormProps {
-  event?: Event | null
+  event?: EventData | null
   onClose: () => void
   onSave: () => void
+}
+
+// Shared label style
+const LBL = 'block text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5'
+// Input style — only transition specific props (not transition-all, which repaints on every keypress)
+const INPUT =
+  'w-full px-3 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary'
+
+// Today in local YYYY-MM-DD (avoids UTC vs local timezone mismatch)
+function todayLocal(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
 }
 
 export default function EventForm({ event, onClose, onSave }: EventFormProps) {
   const { user } = useAuth()
 
-  // ── Uncontrolled refs for text fields (no re-render on every keystroke) ──
-  const titleRef = useRef<HTMLInputElement>(null)
+  // ── All form fields as UNCONTROLLED refs — zero re-renders while typing ──
+  const titleRef       = useRef<HTMLInputElement>(null)
+  const categoryRef    = useRef<HTMLSelectElement>(null)
+  const priorityRef    = useRef<HTMLSelectElement>(null)
+  const courseRef      = useRef<HTMLSelectElement>(null)
+  const dateRef        = useRef<HTMLInputElement>(null)
+  const startTimeRef   = useRef<HTMLInputElement>(null)
+  const endTimeRef     = useRef<HTMLInputElement>(null)
+  const locationRef    = useRef<HTMLInputElement>(null)
+  const statusRef      = useRef<HTMLSelectElement>(null)
   const descriptionRef = useRef<HTMLTextAreaElement>(null)
-  const locationRef = useRef<HTMLInputElement>(null)
 
-  // ── Controlled state only for selects & submit UI ──
-  const [category, setCategory] = useState(event?.category || 'event')
-  const [course, setCourse] = useState(event?.course || '')
-  const [date, setDate] = useState(event?.date || new Date().toISOString().split('T')[0])
-  const [startTime, setStartTime] = useState(event?.time || '')
-  const [endTime, setEndTime] = useState(event?.end_time || '')
-  const [priority, setPriority] = useState<Event['priority']>(event?.priority || 'medium')
-  const [status, setStatus] = useState<Event['status']>(event?.status || 'upcoming')
+  // Only state needed: submit status + error message + entrance animation flag
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error,   setError  ] = useState('')
+  const [visible, setVisible] = useState(false)
 
+  // Trigger CSS entrance animation after first paint (rAF avoids FOUC)
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  // Delayed focus on title (avoids portal jank from immediate autoFocus)
+  useEffect(() => {
+    const t = setTimeout(() => titleRef.current?.focus(), 80)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Escape key closes the form (when not submitting)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose, loading])
+
+  // ── Submit handler ──────────────────────────────────────────────────────
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault()
-    const title = titleRef.current?.value.trim() || ''
-    if (!title) { setError('Title is required.'); return }
-    if (!date) { setError('Date is required.'); return }
+    const title = titleRef.current?.value.trim() ?? ''
+    const date  = dateRef.current?.value ?? ''
+
+    if (!title) { setError('Title is required.'); titleRef.current?.focus(); return }
+    if (!date)  { setError('Date is required.');  dateRef.current?.focus();  return }
+    if (!user?.id) { setError('Not authenticated. Please refresh and log in again.'); return }
 
     setLoading(true)
     setError('')
 
-    const payload = {
+    // Build payload — only send fields that exist in the schema
+    const payload: Record<string, unknown> = {
       title,
-      description: descriptionRef.current?.value || null,
-      category,
-      course: course || null,
+      description : descriptionRef.current?.value.trim()  || null,
+      category    : categoryRef.current?.value             || 'event',
       date,
-      time: startTime || null,
-      end_time: endTime || null,
-      location: locationRef.current?.value || null,
-      priority,
-      status,
-      created_by: user?.id || '',
+      time        : startTimeRef.current?.value            || null,
+      end_time    : endTimeRef.current?.value              || null,
+      location    : locationRef.current?.value.trim()      || null,
+      priority    : priorityRef.current?.value             || 'medium',
+      status      : statusRef.current?.value               || 'upcoming',
+      created_by  : user.id,
     }
 
-    let err
-    if (event?.id) {
-      const res = await supabase.from('events').update(payload).eq('id', event.id)
-      err = res.error
-    } else {
-      const res = await supabase.from('events').insert(payload)
-      err = res.error
+    // Include course only if selected (graceful — column may not exist in all deployments)
+    const courseVal = courseRef.current?.value || null
+    if (courseVal) payload.course = courseVal
+
+    const tryInsertOrUpdate = async (data: Record<string, unknown>) => {
+      if (event?.id) {
+        // Don't overwrite created_by on updates
+        const { created_by: _omit, ...updateData } = data
+        return supabase.from('events').update(updateData).eq('id', event.id!)
+      } else {
+        return supabase.from('events').insert(data)
+      }
     }
 
-    setLoading(false)
-    if (err) { setError(err.message); return }
-    onSave()
-  }, [category, course, date, startTime, endTime, priority, status, user, event, onSave])
+    try {
+      let { error: dbError } = await tryInsertOrUpdate(payload)
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Plain overlay — no blur */}
-      <div className="absolute inset-0 bg-black/55" onClick={onClose} />
+      // If the error mentions 'course', that column doesn't exist — retry without it
+      if (dbError && dbError.message?.toLowerCase().includes('course')) {
+        const { course: _omit, ...payloadWithoutCourse } = payload
+        const result = await tryInsertOrUpdate(payloadWithoutCourse)
+        dbError = result.error
+      }
 
-      {/* Modal — contain: layout paint to isolate from calendar grid */}
+      if (dbError) {
+        setError(dbError.message)
+        setLoading(false)
+        return
+      }
+
+      // Success — onSave() will close form and refresh events list
+      onSave()
+    } catch (ex: unknown) {
+      setError(ex instanceof Error ? ex.message : 'Unexpected error. Please try again.')
+      setLoading(false)
+    }
+  }, [user, event, onSave])
+
+  // ── Safe close (prevent close while saving) ─────────────────────────────
+  const handleClose = useCallback(() => {
+    if (!loading) onClose()
+  }, [loading, onClose])
+
+  // ── Modal JSX ───────────────────────────────────────────────────────────
+  const modal = (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ isolation: 'isolate' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={event?.id ? 'Edit Event' : 'Create New Event'}
+    >
+      {/* Animated backdrop */}
       <div
-        className="relative bg-background rounded-2xl shadow-panel w-full max-w-lg max-h-[90vh] overflow-y-auto"
-        style={{ contain: 'layout paint' }}
+        className="absolute inset-0 bg-black/55"
+        onClick={handleClose}
+        style={{
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 160ms ease',
+          willChange: 'opacity',
+        }}
+        aria-hidden="true"
+      />
+
+      {/* Dialog panel — GPU compositing layer, animated entrance */}
+      <div
+        className="relative bg-background rounded-2xl border border-border w-full max-w-lg"
+        style={{
+          maxHeight: '90dvh',
+          overflowY: 'scroll',   // 'scroll' reserves scrollbar — avoids layout shift on overflow
+          transform: visible ? 'translateY(0) scale(1)' : 'translateY(18px) scale(0.97)',
+          opacity: visible ? 1 : 0,
+          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 160ms ease',
+          willChange: 'transform, opacity',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.22), 0 0 0 1px rgba(255,255,255,0.04)',
+        }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-background z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-base font-semibold text-foreground">
             {event?.id ? 'Edit Event' : 'Create New Event'}
           </h2>
           <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground"
-            style={{ transition: 'background-color 120ms ease, color 120ms ease' }}
+            type="button"
+            onClick={handleClose}
+            disabled={loading}
+            className="p-1.5 rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-40"
+            style={{ transition: 'background-color 100ms' }}
+            aria-label="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+        {/* Form — all inputs are uncontrolled (defaultValue) — ZERO re-renders while typing */}
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4" noValidate>
 
-          {/* Title — UNCONTROLLED (ref), zero re-renders while typing */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Title *</label>
+          {/* Title */}
+          <div>
+            <label className={LBL}>Title *</label>
             <input
               ref={titleRef}
-              defaultValue={event?.title || ''}
+              defaultValue={event?.title ?? ''}
               placeholder="Event title..."
-              className="cd-input"
-              required
-              autoFocus
+              className={INPUT}
+              style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+              maxLength={200}
             />
           </div>
 
           {/* Category + Priority */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Category</label>
-              <select className="cd-input" value={category} onChange={e => setCategory(e.target.value)}>
+            <div>
+              <label className={LBL}>Category</label>
+              <select
+                ref={categoryRef}
+                defaultValue={event?.category ?? 'event'}
+                className={INPUT}
+                style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+              >
                 {ALL_CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</option>
+                  <option key={cat} value={cat}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </option>
                 ))}
               </select>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Priority</label>
-              <select className="cd-input" value={priority} onChange={e => setPriority(e.target.value as Event['priority'])}>
+            <div>
+              <label className={LBL}>Priority</label>
+              <select
+                ref={priorityRef}
+                defaultValue={event?.priority ?? 'medium'}
+                className={INPUT}
+                style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+              >
                 <option value="low">Low</option>
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
@@ -142,65 +253,89 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
           </div>
 
           {/* Course */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Course</label>
-            <select className="cd-input" value={course} onChange={e => setCourse(e.target.value)}>
+          <div>
+            <label className={LBL}>Course</label>
+            <select
+              ref={courseRef}
+              defaultValue={event?.course ?? ''}
+              className={INPUT}
+              style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+            >
               <option value="">— None —</option>
               {COURSES.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
 
           {/* Date */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Date *</label>
+          <div>
+            <label className={LBL}>Date *</label>
             <div className="relative">
               <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <input
+                ref={dateRef}
                 type="date"
-                className="cd-input pl-9"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                required
+                defaultValue={event?.date ?? todayLocal()}
+                className={INPUT + ' pl-9'}
+                style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
               />
             </div>
           </div>
 
-          {/* Time */}
+          {/* Start + End Time */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Start Time</label>
+            <div>
+              <label className={LBL}>Start Time</label>
               <div className="relative">
                 <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input type="time" className="cd-input pl-9" value={startTime} onChange={e => setStartTime(e.target.value)} />
+                <input
+                  ref={startTimeRef}
+                  type="time"
+                  defaultValue={event?.time ?? ''}
+                  className={INPUT + ' pl-9'}
+                  style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+                />
               </div>
             </div>
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">End Time</label>
+            <div>
+              <label className={LBL}>End Time</label>
               <div className="relative">
                 <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-                <input type="time" className="cd-input pl-9" value={endTime} onChange={e => setEndTime(e.target.value)} />
+                <input
+                  ref={endTimeRef}
+                  type="time"
+                  defaultValue={event?.end_time ?? ''}
+                  className={INPUT + ' pl-9'}
+                  style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+                />
               </div>
             </div>
           </div>
 
-          {/* Location — UNCONTROLLED (ref) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Location</label>
+          {/* Location */}
+          <div>
+            <label className={LBL}>Location</label>
             <div className="relative">
               <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
               <input
                 ref={locationRef}
-                defaultValue={event?.location || ''}
+                defaultValue={event?.location ?? ''}
                 placeholder="Location or meeting link..."
-                className="cd-input pl-9"
+                className={INPUT + ' pl-9'}
+                style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+                maxLength={300}
               />
             </div>
           </div>
 
           {/* Status */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</label>
-            <select className="cd-input" value={status} onChange={e => setStatus(e.target.value as Event['status'])}>
+          <div>
+            <label className={LBL}>Status</label>
+            <select
+              ref={statusRef}
+              defaultValue={event?.status ?? 'upcoming'}
+              className={INPUT}
+              style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
+            >
               <option value="upcoming">Upcoming</option>
               <option value="ongoing">Ongoing</option>
               <option value="completed">Completed</option>
@@ -208,46 +343,57 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
             </select>
           </div>
 
-          {/* Description — UNCONTROLLED (ref) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</label>
+          {/* Description */}
+          <div>
+            <label className={LBL}>Description</label>
             <textarea
               ref={descriptionRef}
-              defaultValue={event?.description || ''}
+              defaultValue={event?.description ?? ''}
               placeholder="Add details about this event..."
-              className="cd-input min-h-[80px] resize-none"
+              className={INPUT + ' min-h-[80px] resize-none'}
+              style={{ transition: 'border-color 100ms, box-shadow 100ms' }}
               rows={3}
             />
           </div>
 
+          {/* Error message */}
           {error && (
-            <div className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm">
+            <div
+              className="p-3 rounded-lg bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 text-sm"
+              role="alert"
+            >
               {error}
             </div>
           )}
 
-          {/* Actions */}
-          <div className="flex items-center gap-3 pt-2">
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 pt-2 pb-1">
             <button
               type="button"
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-secondary"
-              style={{ transition: 'background-color 120ms ease' }}
+              onClick={handleClose}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-secondary disabled:opacity-40"
+              style={{ transition: 'background-color 100ms' }}
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] disabled:opacity-60"
-              style={{ transition: 'background-color 120ms ease, transform 80ms ease' }}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-white rounded-lg text-sm font-medium hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ transition: 'opacity 100ms, transform 80ms' }}
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-              {event?.id ? 'Save Changes' : 'Create Event'}
+              {loading
+                ? <><Loader2 className="w-4 h-4 animate-spin" /><span>Saving…</span></>
+                : <><Save className="w-4 h-4" /><span>{event?.id ? 'Save Changes' : 'Create Event'}</span></>
+              }
             </button>
           </div>
         </form>
       </div>
     </div>
   )
+
+  // Render into document.body portal — completely outside the CalendarPage tree
+  return ReactDOM.createPortal(modal, document.body)
 }
