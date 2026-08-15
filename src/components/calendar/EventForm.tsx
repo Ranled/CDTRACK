@@ -4,11 +4,14 @@ import { useAuth } from '@/contexts/AuthContext'
 import { X, Calendar, Clock, MapPin, Tag, AlertCircle, Save, Loader2 } from 'lucide-react'
 import { cn, ALL_CATEGORIES } from '@/lib/utils'
 
+const COURSES = ['OS101', 'HCI101', 'SP101', 'NC101', 'THS102']
+
 interface Event {
   id?: string
   title: string
   description: string | null
   category: string
+  course: string | null
   date: string
   time: string | null
   end_time: string | null
@@ -27,6 +30,7 @@ const defaultEvent: Event = {
   title: '',
   description: '',
   category: 'event',
+  course: '',
   date: new Date().toISOString().split('T')[0],
   time: '',
   end_time: '',
@@ -52,6 +56,7 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
       title: form.title.trim(),
       description: form.description || null,
       category: form.category,
+      course: form.course || null,
       date: form.date,
       time: form.time || null,
       end_time: form.end_time || null,
@@ -80,7 +85,7 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-background rounded-2xl shadow-panel w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-background z-10">
@@ -123,6 +128,17 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
                 <option value="high">High</option>
               </select>
             </div>
+          </div>
+
+          {/* Course */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Course</label>
+            <select className="cd-input" value={form.course || ''} onChange={e => set('course', e.target.value)}>
+              <option value="">— None —</option>
+              {COURSES.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
           </div>
 
           {/* Date */}
