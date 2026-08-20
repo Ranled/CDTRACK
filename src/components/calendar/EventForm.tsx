@@ -138,7 +138,19 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
     }
 
     try {
-      const { data: savedRow, error: dbError } = await tryInsertOrUpdate(payload)
+      let { data: savedRow, error: dbError } = await tryInsertOrUpdate(payload)
+
+      // Graceful fallback: if the DB schema cache doesn't yet include 'course'
+      // (column exists in schema.sql but migration hasn't been run on the live DB),
+      // strip the field and retry — still returns the saved row via .select().single().
+      // FIX: run  ALTER TABLE public.events ADD COLUMN IF NOT EXISTS course TEXT;
+      //      then  NOTIFY pgrst, 'reload schema';  in the Supabase SQL Editor.
+      if (dbError && dbError.message?.toLowerCase().includes('course')) {
+        const { course: _omit, ...payloadWithoutCourse } = payload
+        const result = await tryInsertOrUpdate(payloadWithoutCourse)
+        savedRow  = result.data
+        dbError   = result.error
+      }
 
       if (dbError) {
         setError(dbError.message)
