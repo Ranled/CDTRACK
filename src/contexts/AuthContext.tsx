@@ -201,6 +201,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return { error: `Sign-in error: ${signInError.message}` }
     }
 
+    if (signInData?.session) {
+      setSession(signInData.session)
+    }
+
     if (activeUser) {
       setUser(activeUser)
       await fetchProfile(activeUser.id, activeUser)

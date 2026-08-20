@@ -134,7 +134,9 @@ export default function DashboardPage() {
     }
   }, [isViewer])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData()
+  }, [fetchData, user?.id])
 
   const completed = allEvents.filter(e => e.status === 'completed').length
   const total = allEvents.length
