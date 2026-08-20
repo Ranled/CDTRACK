@@ -14,6 +14,7 @@ interface Event {
   id: string
   title: string
   category: string
+  course?: string | null
   date: string
   time: string | null
   end_time: string | null
@@ -292,6 +293,11 @@ export default function DashboardPage() {
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-1">
+                        {event.course && (
+                          <span className="text-[10px] font-bold font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                            {event.course}
+                          </span>
+                        )}
                         {event.time && (
                           <span className="text-xs text-muted-foreground">{formatTime(event.time)}</span>
                         )}
@@ -342,7 +348,14 @@ export default function DashboardPage() {
                         )} />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-foreground truncate">{event.title}</p>
+                          {event.course && (
+                            <span className="text-[9px] font-bold font-mono px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 flex-shrink-0">
+                              {event.course}
+                            </span>
+                          )}
+                        </div>
                         <p className={cn(
                           'text-xs font-medium mt-0.5',
                           isUrgent ? 'text-red-600 dark:text-red-400' : isSoon ? 'text-yellow-600 dark:text-yellow-400' : 'text-muted-foreground'

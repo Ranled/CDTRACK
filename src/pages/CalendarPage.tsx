@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   ChevronLeft, ChevronRight, Plus, X, Edit2, Trash2,
-  MapPin, Clock, Tag, AlertCircle, Filter
+  MapPin, Clock, Tag, AlertCircle, Filter, GraduationCap
 } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -74,13 +74,19 @@ const DayCell = memo(({ day, isCurrentMonth, isTodayDate, dayEvents, onEventClic
           key={event.id}
           onClick={() => onEventClick(event)}
           className={cn(
-            'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate hover:opacity-80 active:scale-[0.97]',
+            'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate hover:opacity-80 active:scale-[0.97] flex items-center gap-1',
             colors(event.category).bg,
             colors(event.category).text
           )}
+          title={event.course ? `[${event.course}] ${event.title}` : event.title}
         >
-          {event.time && <span className="opacity-70">{formatTime(event.time).replace(' AM', 'a').replace(' PM', 'p')} </span>}
-          {event.title}
+          {event.course && (
+            <span className="font-bold opacity-90 px-1 rounded bg-black/10 dark:bg-white/20 text-[9px] flex-shrink-0 font-mono">
+              {event.course}
+            </span>
+          )}
+          {event.time && <span className="opacity-70 flex-shrink-0">{formatTime(event.time).replace(' AM', 'a').replace(' PM', 'p')} </span>}
+          <span className="truncate">{event.title}</span>
         </button>
       ))}
       {dayEvents.length > 3 && (
@@ -140,7 +146,11 @@ export default function CalendarPage() {
     }
     if (urlSearch) {
       const q = urlSearch.toLowerCase()
-      list = list.filter(e => e.title.toLowerCase().includes(q) || (e.description && e.description.toLowerCase().includes(q)))
+      list = list.filter(e =>
+        e.title.toLowerCase().includes(q) ||
+        (e.description && e.description.toLowerCase().includes(q)) ||
+        (e.course && e.course.toLowerCase().includes(q))
+      )
     }
     return list
   }, [events, activeFilters, urlSearch])
@@ -175,8 +185,8 @@ export default function CalendarPage() {
   const handleEventClick = useCallback((event: CalEvent) => setSelectedEvent(event), [])
 
   const handleOpenCreate = useCallback(() => { setEditingEvent(null); setShowForm(true) }, [])
-  const handleOpenEdit = useCallback(() => { setEditingEvent(selectedEvent); setShowForm(true) }, [selectedEvent])
-  const handleFormClose = useCallback(() => { setShowForm(false); setEditingEvent(null) }, [])
+  const handleOpenEdit   = useCallback(() => { setEditingEvent(selectedEvent); setShowForm(true) }, [selectedEvent])
+  const handleFormClose  = useCallback(() => { setShowForm(false); setEditingEvent(null) }, [])
   
   const handleFormSave = useCallback((savedEvent: CalEvent) => {
     setShowForm(false)
@@ -244,10 +254,10 @@ export default function CalendarPage() {
             {isAdmin && (
               <button
                 onClick={handleOpenCreate}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] transition-all duration-150"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 shadow-sm"
               >
                 <Plus className="w-4 h-4" />
-                Add
+                Add Event
               </button>
             )}
           </div>
@@ -324,15 +334,24 @@ export default function CalendarPage() {
       {/* Event Detail Panel */}
       {selectedEvent && (
         <>
-          <div className="fixed inset-0 z-20 lg:hidden" onClick={() => setSelectedEvent(null)} />
-          <div className="w-full lg:w-[340px] flex-shrink-0 border-l border-border bg-background overflow-y-auto animate-slide-in-right z-30 lg:relative fixed right-0 top-16 bottom-0">
-            <div className="p-5 space-y-5">
+          <div className="fixed inset-0 z-20 lg:hidden bg-black/40 backdrop-blur-sm animate-fade-in" onClick={() => setSelectedEvent(null)} />
+          <div className="w-full lg:w-[360px] flex-shrink-0 border-l border-border bg-background overflow-y-auto animate-slide-in-right z-30 lg:relative fixed right-0 top-16 bottom-0 shadow-2xl lg:shadow-none">
+            <div className="p-5 sm:p-6 space-y-5">
+              {/* Header */}
               <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <span className={cn('text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full', getColors(selectedEvent.category).bg, getColors(selectedEvent.category).text)}>
-                    {selectedEvent.category}
-                  </span>
-                  <h2 className="text-lg font-bold text-foreground mt-2 leading-tight">{selectedEvent.title}</h2>
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn('text-[10px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-sm', getColors(selectedEvent.category).bg, getColors(selectedEvent.category).text)}>
+                      {selectedEvent.category}
+                    </span>
+                    {selectedEvent.course && (
+                      <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center gap-1 shadow-sm">
+                        <GraduationCap className="w-3 h-3" />
+                        {selectedEvent.course}
+                      </span>
+                    )}
+                  </div>
+                  <h2 className="text-xl font-bold text-foreground leading-snug">{selectedEvent.title}</h2>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {isAdmin && (
@@ -340,12 +359,14 @@ export default function CalendarPage() {
                       <button
                         onClick={handleOpenEdit}
                         className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                        title="Edit event"
                       >
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
                         onClick={() => handleDeleteEvent(selectedEvent.id)}
                         className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-muted-foreground hover:text-red-600 transition-colors"
+                        title="Delete event"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -354,13 +375,30 @@ export default function CalendarPage() {
                   <button
                     onClick={() => setSelectedEvent(null)}
                     className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                    title="Close"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-3">
+              {/* Detail Items */}
+              <div className="space-y-3.5 pt-2">
+                {/* Course subject (prominent card if present) */}
+                {selectedEvent.course && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/15 text-sm">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0">
+                      <GraduationCap className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <span className="text-[11px] font-semibold text-primary uppercase tracking-wider block">Course Subject</span>
+                      <span className="text-foreground font-mono font-bold text-sm">
+                        {selectedEvent.course}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <div>
@@ -368,7 +406,7 @@ export default function CalendarPage() {
                       {format(parseISO(selectedEvent.date), 'MMMM d, yyyy')}
                     </span>
                     {selectedEvent.time && (
-                      <span className="text-muted-foreground ml-2">
+                      <span className="text-muted-foreground ml-2 font-mono text-xs">
                         {formatTime(selectedEvent.time)}
                         {selectedEvent.end_time && ` – ${formatTime(selectedEvent.end_time)}`}
                       </span>
@@ -383,16 +421,9 @@ export default function CalendarPage() {
                   </div>
                 )}
 
-                {selectedEvent.course && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Tag className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                    <span className="text-foreground font-mono text-xs bg-secondary px-2 py-0.5 rounded">{selectedEvent.course}</span>
-                  </div>
-                )}
-
                 <div className="flex items-center gap-3 text-sm">
                   <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <span className={cn('text-xs font-semibold px-2 py-0.5 rounded-full capitalize', getPriorityColor(selectedEvent.priority))}>
+                  <span className={cn('text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize', getPriorityColor(selectedEvent.priority))}>
                     {selectedEvent.priority} priority
                   </span>
                 </div>
@@ -400,7 +431,7 @@ export default function CalendarPage() {
                 <div className="flex items-center gap-3 text-sm">
                   <Tag className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span className={cn(
-                    'text-xs font-medium px-2 py-0.5 rounded-full capitalize',
+                    'text-xs font-medium px-2.5 py-0.5 rounded-full capitalize',
                     selectedEvent.status === 'completed' ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400' :
                     selectedEvent.status === 'ongoing' ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400' :
                     selectedEvent.status === 'cancelled' ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400' :
@@ -412,14 +443,14 @@ export default function CalendarPage() {
               </div>
 
               {selectedEvent.description && (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 pt-2 border-t border-border">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Description</p>
                   <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{selectedEvent.description}</p>
                 </div>
               )}
 
               <div className="pt-2 border-t border-border">
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-[10px] text-muted-foreground font-mono">
                   Created {format(parseISO(selectedEvent.created_at), 'MMM d, yyyy')}
                 </p>
               </div>
