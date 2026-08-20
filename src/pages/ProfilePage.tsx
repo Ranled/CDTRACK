@@ -140,13 +140,15 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        {/* Notifications */}
-        <div className="flex items-center justify-between">
+        {/* Notifications & 3-Hour Alarm */}
+        <div className="flex items-center justify-between gap-3 pt-2 border-t border-border">
           <div className="flex items-center gap-3">
-            <Bell className="w-4 h-4 text-muted-foreground" />
+            <div className="p-2 rounded-lg bg-secondary text-muted-foreground">
+              <Bell className="w-4 h-4 text-primary" />
+            </div>
             <div>
-              <p className="text-sm font-medium text-foreground">Browser Notifications</p>
-              <p className="text-xs text-muted-foreground">Receive deadline and reminder alerts</p>
+              <p className="text-sm font-medium text-foreground">3-Hour Deadline Alarm</p>
+              <p className="text-xs text-muted-foreground">Audio chime & push alerts 3 hours before deadlines</p>
             </div>
           </div>
           <button
@@ -154,15 +156,15 @@ export default function ProfilePage() {
               if ('Notification' in window) {
                 Notification.requestPermission().then(perm => {
                   if (perm === 'granted') {
-                    new Notification('CD TRACK Notifications Enabled', {
-                      body: "You'll receive reminders for upcoming deadlines and events.",
+                    new Notification('⏰ CD TRACK 3-Hour Deadline Alarm Enabled', {
+                      body: "You'll be alerted 3 hours before every assignment and exam deadline.",
                       icon: '/logo.png',
                     })
                   }
                 })
               }
             }}
-            className="px-3 py-1.5 text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 rounded-lg transition-colors"
+            className="px-3 py-1.5 text-xs font-semibold bg-primary text-white hover:bg-primary-700 rounded-lg transition-colors shadow-sm"
           >
             Enable
           </button>
