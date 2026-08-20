@@ -200,16 +200,28 @@ CREATE POLICY "announcements_write_admin" ON public.announcements FOR ALL USING 
   EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
--- NOTES: All authenticated users can READ; only admins can INSERT/UPDATE/DELETE
+-- NOTES: All members can READ and INSERT notes; authors/admins can UPDATE; ONLY Admins can DELETE
 DROP POLICY IF EXISTS "notes_own" ON public.notes;
+DROP POLICY IF EXISTS "notes_write_admin" ON public.notes;
 
 DROP POLICY IF EXISTS "notes_read_all" ON public.notes;
 CREATE POLICY "notes_read_all" ON public.notes
   FOR SELECT USING (auth.role() = 'authenticated');
 
-DROP POLICY IF EXISTS "notes_write_admin" ON public.notes;
-CREATE POLICY "notes_write_admin" ON public.notes
-  FOR ALL USING (
+DROP POLICY IF EXISTS "notes_insert_authenticated" ON public.notes;
+CREATE POLICY "notes_insert_authenticated" ON public.notes
+  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "notes_update" ON public.notes;
+CREATE POLICY "notes_update" ON public.notes
+  FOR UPDATE USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+    OR auth.uid() = user_id
+  );
+
+DROP POLICY IF EXISTS "notes_delete_admin" ON public.notes;
+CREATE POLICY "notes_delete_admin" ON public.notes
+  FOR DELETE USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
   );
 

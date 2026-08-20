@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   Plus, Search, Pin, PinOff, Trash2, Edit2, X, Save, Loader2, StickyNote, Eye,
-  Calendar, Clock, Maximize2
+  Calendar, Clock, ShieldAlert, Lock
 } from 'lucide-react'
 import { cn, NOTE_COLORS, truncate } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
@@ -28,10 +28,12 @@ interface NoteViewModalProps {
   onEdit?: () => void
   onDelete?: () => void
   isAdmin: boolean
+  canEdit: boolean
 }
 
-function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin }: NoteViewModalProps) {
+function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin, canEdit }: NoteViewModalProps) {
   const [visible, setVisible] = useState(false)
+  const [showDeleteHelp, setShowDeleteHelp] = useState(false)
 
   useEffect(() => {
     const raf = requestAnimationFrame(() => setVisible(true))
@@ -96,7 +98,7 @@ function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin 
 
           {/* Right actions + Prominent X Close Button */}
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {isAdmin && onEdit && (
+            {canEdit && onEdit && (
               <button
                 onClick={() => { onClose(); setTimeout(() => onEdit(), 80) }}
                 className={cn('flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium hover:bg-black/10 dark:hover:bg-white/10 transition-colors', textColor)}
@@ -106,16 +108,28 @@ function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin 
                 <span className="hidden sm:inline">Edit</span>
               </button>
             )}
-            {isAdmin && onDelete && (
+
+            {/* Admin Delete vs Member Delete Notice */}
+            {isAdmin && onDelete ? (
               <button
                 onClick={() => { onClose(); onDelete() }}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors"
-                title="Delete note"
+                title="Delete note (Admin)"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Delete</span>
               </button>
+            ) : !isAdmin && (
+              <button
+                onClick={() => setShowDeleteHelp(v => !v)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium opacity-60 hover:opacity-100 hover:bg-black/10 dark:hover:bg-white/10 transition-all"
+                title="Only admins can delete notes"
+              >
+                <Lock className="w-3 h-3" />
+                <span className="hidden sm:inline">Delete Info</span>
+              </button>
             )}
+
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-black/15 dark:hover:bg-white/15 text-foreground/80 hover:text-foreground transition-colors ml-1"
@@ -126,6 +140,19 @@ function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin 
             </button>
           </div>
         </div>
+
+        {/* Member delete notice banner */}
+        {showDeleteHelp && !isAdmin && (
+          <div className="px-5 py-2.5 bg-amber-500/15 border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-900 dark:text-amber-200">
+            <span className="flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              Only Administrators can delete class notes. Please contact an Admin if you wish to remove this note.
+            </span>
+            <button onClick={() => setShowDeleteHelp(false)} className="p-1 hover:bg-amber-500/20 rounded">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
 
         {/* Window Content Body */}
         <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-4">
@@ -177,14 +204,15 @@ function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin 
   )
 }
 
-// ─── EDIT / CREATE MODAL (admin only) ─────────────────────────────────────
+// ─── EDIT / CREATE MODAL (Available to both Member & Admin) ─────────────────
 interface NoteModalProps {
   note: Note | null
   onClose: () => void
   onSave: (data: { title: string; content: string; color: string; pinned: boolean }) => Promise<void>
+  isAdmin: boolean
 }
 
-function NoteModal({ note, onClose, onSave }: NoteModalProps) {
+function NoteModal({ note, onClose, onSave, isAdmin }: NoteModalProps) {
   const titleRef    = useRef<HTMLInputElement>(null)
   const contentRef  = useRef<HTMLTextAreaElement>(null)
   const [color, setColor]   = useState(note?.color || '#FFFFFF')
@@ -274,11 +302,14 @@ function NoteModal({ note, onClose, onSave }: NoteModalProps) {
             </div>
           </div>
 
-          <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
-            <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)}
-              className="w-4 h-4 rounded border-border text-primary" />
-            <span className="text-sm font-medium text-foreground">Pin this note to the top</span>
-          </label>
+          {/* Pin option — only admins can pin to top */}
+          {isAdmin && (
+            <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
+              <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)}
+                className="w-4 h-4 rounded border-border text-primary" />
+              <span className="text-sm font-medium text-foreground">Pin this note to the top</span>
+            </label>
+          )}
 
           <div className="flex items-center gap-3 pt-3 border-t border-border">
             <button type="button" onClick={onClose} disabled={saving}
@@ -333,9 +364,12 @@ export default function NotesPage() {
     )
   }, [notes, searchQuery])
 
-  // Admin-only write actions
+  // Both Admin & Member can create notes
   const openCreate = () => { setEditingNote(null); setShowModal(true) }
-  const openEdit   = (note: Note) => { setEditingNote(note); setShowModal(true) }
+  
+  // Can edit if admin or author
+  const canEditNote = (note: Note) => isAdmin || (user && user.id === note.user_id)
+  const openEdit    = (note: Note) => { setEditingNote(note); setShowModal(true) }
 
   const handleSaveNote = async (data: { title: string; content: string; color: string; pinned: boolean }) => {
     if (!user) return
@@ -353,12 +387,15 @@ export default function NotesPage() {
     }
   }
 
+  // Delete is strictly Admin-only
   const handleDelete = async (id: string) => {
+    if (!isAdmin) return
     setNotes(prev => prev.filter(n => n.id !== id))
     await supabase.from('notes').delete().eq('id', id)
   }
 
   const togglePin = async (note: Note) => {
+    if (!isAdmin) return
     const newPinned = !note.pinned
     setNotes(prev => {
       const updated = prev.map(n => n.id === note.id ? { ...n, pinned: newPinned } : n)
@@ -376,18 +413,18 @@ export default function NotesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Class Notes</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Shared notes board · click any note card to open full-window view
+            Shared notes board · all members can add notes · only admins can delete notes
           </p>
         </div>
-        {isAdmin && (
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            New Note
-          </button>
-        )}
+
+        {/* "New Note" Button is now visible to ALL users (Admin & Member) */}
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          New Note
+        </button>
       </div>
 
       {/* Search */}
@@ -413,82 +450,96 @@ export default function NotesPage() {
             {searchQuery ? 'No notes match your search' : 'No notes yet'}
           </p>
           <p className="text-sm text-muted-foreground/60 mt-1">
-            {!searchQuery && isAdmin && 'Click "New Note" to post the first note.'}
+            Click "New Note" above to add your thought to the class board.
           </p>
         </div>
       ) : (
         <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
-          {filteredNotes.map(note => (
-            <div
-              key={note.id}
-              className="break-inside-avoid mb-4 rounded-xl border border-border shadow-card hover:shadow-card-hover transition-all duration-150 overflow-hidden group cursor-pointer active:scale-[0.99]"
-              style={{ backgroundColor: note.color }}
-              onClick={() => setViewingNote(note)}
-            >
-              <div className="p-4 space-y-2">
-                {/* Note header */}
-                <div className="flex items-start justify-between gap-2">
-                  <h3 className={cn('font-semibold text-sm leading-tight', getTextColor(note.color))}>
-                    {note.title}
-                  </h3>
+          {filteredNotes.map(note => {
+            const isAuthor = Boolean(user && user.id === note.user_id)
+            const canEdit = Boolean(isAdmin || isAuthor)
 
-                  {/* Admin action buttons */}
-                  {isAdmin && (
+            return (
+              <div
+                key={note.id}
+                className="break-inside-avoid mb-4 rounded-xl border border-border shadow-card hover:shadow-card-hover transition-all duration-150 overflow-hidden group cursor-pointer active:scale-[0.99]"
+                style={{ backgroundColor: note.color }}
+                onClick={() => setViewingNote(note)}
+              >
+                <div className="p-4 space-y-2">
+                  {/* Note header */}
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className={cn('font-semibold text-sm leading-tight', getTextColor(note.color))}>
+                      {note.title}
+                    </h3>
+
+                    {/* Action buttons on card hover */}
                     <div
                       className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                       onClick={e => e.stopPropagation()}
                     >
-                      <button
-                        onClick={() => togglePin(note)}
-                        className="p-1 rounded hover:bg-black/10 transition-colors"
-                        title={note.pinned ? 'Unpin' : 'Pin'}
-                      >
-                        {note.pinned
-                          ? <PinOff className={cn('w-3.5 h-3.5', getTextColor(note.color))} />
-                          : <Pin    className={cn('w-3.5 h-3.5', getTextColor(note.color))} />}
-                      </button>
-                      <button
-                        onClick={() => openEdit(note)}
-                        className="p-1 rounded hover:bg-black/10 transition-colors"
-                        title="Edit"
-                      >
-                        <Edit2 className={cn('w-3.5 h-3.5', getTextColor(note.color))} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(note.id)}
-                        className="p-1 rounded hover:bg-red-500/20 transition-colors text-red-600"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Pin (Admin only) */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => togglePin(note)}
+                          className="p-1 rounded hover:bg-black/10 transition-colors"
+                          title={note.pinned ? 'Unpin' : 'Pin'}
+                        >
+                          {note.pinned
+                            ? <PinOff className={cn('w-3.5 h-3.5', getTextColor(note.color))} />
+                            : <Pin    className={cn('w-3.5 h-3.5', getTextColor(note.color))} />}
+                        </button>
+                      )}
+
+                      {/* Edit (Admin or Author) */}
+                      {canEdit && (
+                        <button
+                          onClick={() => openEdit(note)}
+                          className="p-1 rounded hover:bg-black/10 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit2 className={cn('w-3.5 h-3.5', getTextColor(note.color))} />
+                        </button>
+                      )}
+
+                      {/* Delete (STRICTLY ADMIN ONLY) */}
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(note.id)}
+                          className="p-1 rounded hover:bg-red-500/20 transition-colors text-red-600"
+                          title="Delete (Admin only)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
+                  </div>
+
+                  {note.pinned && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
+                      <Pin className="w-2.5 h-2.5" /> Pinned
+                    </span>
                   )}
-                </div>
 
-                {note.pinned && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary">
-                    <Pin className="w-2.5 h-2.5" /> Pinned
-                  </span>
-                )}
+                  {note.content && (
+                    <p className={cn('text-xs leading-relaxed whitespace-pre-wrap', getTextColor(note.color), 'opacity-85')}>
+                      {truncate(note.content, 220)}
+                    </p>
+                  )}
 
-                {note.content && (
-                  <p className={cn('text-xs leading-relaxed whitespace-pre-wrap', getTextColor(note.color), 'opacity-85')}>
-                    {truncate(note.content, 220)}
+                  {note.content.length > 220 && (
+                    <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold opacity-60 pt-1', getTextColor(note.color))}>
+                      <Eye className="w-3 h-3" /> View full note
+                    </span>
+                  )}
+
+                  <p className={cn('text-[10px] mt-2 opacity-50 font-mono', getTextColor(note.color))}>
+                    {format(parseISO(note.updated_at || note.created_at), 'MMM d, yyyy')}
                   </p>
-                )}
-
-                {note.content.length > 220 && (
-                  <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold opacity-60 pt-1', getTextColor(note.color))}>
-                    <Eye className="w-3 h-3" /> View full note
-                  </span>
-                )}
-
-                <p className={cn('text-[10px] mt-2 opacity-50 font-mono', getTextColor(note.color))}>
-                  {format(parseISO(note.updated_at || note.created_at), 'MMM d, yyyy')}
-                </p>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -499,17 +550,19 @@ export default function NotesPage() {
           getTextColor={getTextColor}
           onClose={() => setViewingNote(null)}
           isAdmin={isAdmin}
-          onEdit={isAdmin ? () => { setViewingNote(null); openEdit(viewingNote) } : undefined}
+          canEdit={Boolean(canEditNote(viewingNote))}
+          onEdit={() => { setViewingNote(null); openEdit(viewingNote) }}
           onDelete={isAdmin ? () => { setViewingNote(null); handleDelete(viewingNote.id) } : undefined}
         />
       )}
 
-      {/* Edit / create modal */}
+      {/* Edit / Create modal (Accessible by Members & Admin) */}
       {showModal && (
         <NoteModal
           note={editingNote}
           onClose={() => { setShowModal(false); setEditingNote(null) }}
           onSave={handleSaveNote}
+          isAdmin={isAdmin}
         />
       )}
     </div>
