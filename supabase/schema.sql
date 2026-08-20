@@ -161,6 +161,32 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
 
 -- ================================================
+-- AUTO-NOTIFY ON NEW ANNOUNCEMENT (Excludes Viewers)
+-- ================================================
+CREATE OR REPLACE FUNCTION notify_new_announcement()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.notifications (user_id, title, body, read, type, ref_id)
+  SELECT
+    p.user_id,
+    'New Announcement',
+    NEW.title,
+    FALSE,
+    'announcement',
+    NEW.id
+  FROM public.profiles p
+  WHERE p.role IN ('admin', 'user');
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_announcement_created ON public.announcements;
+CREATE TRIGGER on_announcement_created
+  AFTER INSERT ON public.announcements
+  FOR EACH ROW EXECUTE FUNCTION notify_new_announcement();
+
+-- ================================================
 -- ROW LEVEL SECURITY (RLS)
 -- ================================================
 

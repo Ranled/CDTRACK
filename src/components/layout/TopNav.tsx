@@ -213,8 +213,21 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
         filter: `user_id=eq.${user.id}`,
       }, (payload) => {
         if (!active) return
-        setNotifications(prev => [payload.new as Notification, ...prev])
+        const newNotif = payload.new as Notification
+        setNotifications(prev => [newNotif, ...prev])
         setUnreadCount(c => c + 1)
+
+        // Dispatch browser system notification if permission is granted
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          try {
+            new Notification(newNotif.title || 'CD TRACK Announcement', {
+              body: newNotif.body,
+              icon: '/logo.png',
+              badge: '/logo.png',
+            })
+            if ('vibrate' in navigator) navigator.vibrate([100, 50, 100])
+          } catch (e) {}
+        }
       })
       .subscribe()
 

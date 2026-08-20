@@ -447,20 +447,24 @@ export default function AnnouncementsPage() {
       const { data: inserted } = await supabase.from('announcements').insert(payload).select().single()
       if (inserted) {
         setAnnouncements(prev => prev.map(a => a.id === tempId ? inserted : a))
-        // Fire notifications in background without blocking UI
-        supabase.from('profiles').select('user_id').then(({ data: profiles }) => {
-          if (profiles && profiles.length > 0) {
-            const notifs = profiles.map(p => ({
-              user_id: p.user_id,
-              title: 'New Announcement',
-              body: data.title,
-              read: false,
-              type: 'announcement',
-              ref_id: inserted.id,
-            }))
-            supabase.from('notifications').insert(notifs).then(() => {})
-          }
-        })
+        // Fire notifications in background to all members & admins (EXCEPT viewers)
+        supabase
+          .from('profiles')
+          .select('user_id, role')
+          .neq('role', 'viewer')
+          .then(({ data: profiles }) => {
+            if (profiles && profiles.length > 0) {
+              const notifs = profiles.map(p => ({
+                user_id: p.user_id,
+                title: 'New Announcement',
+                body: data.title,
+                read: false,
+                type: 'announcement',
+                ref_id: inserted.id,
+              }))
+              supabase.from('notifications').insert(notifs).then(() => {})
+            }
+          })
       }
     }
   }
