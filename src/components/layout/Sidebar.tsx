@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   LayoutDashboard, Calendar, StickyNote, Megaphone,
-  Info, User, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X
+  Info, User, Settings, LogOut, ChevronLeft, ChevronRight, Menu, X, Lock
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -30,7 +30,7 @@ interface SidebarProps {
 
 export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
-  const { signOut, profile, isAdmin } = useAuth()
+  const { signOut, profile, isAdmin, isViewer } = useAuth()
   const navigate = useNavigate()
 
   const handleSignOut = async () => {
@@ -63,22 +63,34 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
 
       {/* Nav Items */}
       <nav className="flex-1 p-2 space-y-0.5 overflow-y-auto">
-        {navItems.map(item => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={onMobileClose}
-            className={({ isActive }) => cn(
-              'nav-item group',
-              isActive && 'active',
-              collapsed && 'justify-center px-0 py-2.5'
-            )}
-            title={collapsed ? item.label : undefined}
-          >
-            <span className="flex-shrink-0">{item.icon}</span>
-            {!collapsed && <span className="truncate">{item.label}</span>}
-          </NavLink>
-        ))}
+        {navItems.map(item => {
+          const isItemRestricted = item.to === '/announcements' && isViewer
+
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={onMobileClose}
+              className={({ isActive }) => cn(
+                'nav-item group',
+                isActive && 'active',
+                collapsed && 'justify-center px-0 py-2.5',
+                isItemRestricted && 'opacity-75 hover:opacity-100'
+              )}
+              title={collapsed ? (isItemRestricted ? `${item.label} (Restricted)` : item.label) : undefined}
+            >
+              <span className="flex-shrink-0">{item.icon}</span>
+              {!collapsed && (
+                <span className="flex items-center justify-between flex-1 min-w-0 gap-1.5">
+                  <span className="truncate">{item.label}</span>
+                  {isItemRestricted && (
+                    <Lock className="w-3 h-3 text-amber-500/70 flex-shrink-0" />
+                  )}
+                </span>
+              )}
+            </NavLink>
+          )
+        })}
       </nav>
 
       {/* User info + bottom actions */}

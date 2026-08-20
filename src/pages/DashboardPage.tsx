@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import {
   Calendar, Clock, CheckCircle2, AlertCircle, TrendingUp,
   Plus, ChevronRight, Megaphone, StickyNote, Target,
-  BookOpen, Layers, Timer
+  BookOpen, Layers, Timer, Lock
 } from 'lucide-react'
 import { cn, CATEGORY_COLORS, getDaysUntil, formatTime, isToday } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
@@ -76,7 +76,7 @@ let cachedDashboardData: {
 } | null = null
 
 export default function DashboardPage() {
-  const { profile, user, isAdmin } = useAuth()
+  const { profile, user, isAdmin, isViewer } = useAuth()
   const navigate = useNavigate()
 
   const [todayEvents, setTodayEvents] = useState<Event[]>(() => cachedDashboardData?.todayEvents || [])
@@ -107,7 +107,9 @@ export default function DashboardPage() {
           .select('id, status, priority, date')
           .gte('date', format(new Date(Date.now() - 30 * 86400000), 'yyyy-MM-dd'))
           .limit(500),
-        supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(3),
+        isViewer
+          ? Promise.resolve({ data: [] })
+          : supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(3),
       ])
 
       const newToday = eventsRes.data || []
@@ -130,7 +132,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isViewer])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -374,12 +376,22 @@ export default function DashboardPage() {
           <div className="cd-card">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-foreground">Announcements</h3>
-              <button onClick={() => navigate('/announcements')} className="text-xs text-primary hover:text-primary-700 font-medium flex items-center gap-1 transition-colors">
-                View all <ChevronRight className="w-3 h-3" />
-              </button>
+              {!isViewer && (
+                <button onClick={() => navigate('/announcements')} className="text-xs text-primary hover:text-primary-700 font-medium flex items-center gap-1 transition-colors">
+                  View all <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
             </div>
 
-            {announcements.length === 0 ? (
+            {isViewer ? (
+              <div className="py-6 px-4 text-center rounded-xl bg-secondary/30 border border-dashed border-border">
+                <Lock className="w-6 h-6 text-amber-500/70 mx-auto mb-2" />
+                <p className="text-xs font-semibold text-foreground">Announcements Restricted</p>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  Official updates are reserved for verified members.
+                </p>
+              </div>
+            ) : announcements.length === 0 ? (
               <div className="py-6 text-center">
                 <Megaphone className="w-8 h-8 text-muted-foreground/30 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">No announcements yet</p>

@@ -191,9 +191,16 @@ CREATE POLICY "events_write_admin" ON public.events FOR ALL USING (
   EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
--- ANNOUNCEMENTS: All authenticated users can read; only admins can write
+-- ANNOUNCEMENTS: Verified members and admins can read; only admins can write (viewers restricted)
 DROP POLICY IF EXISTS "announcements_read_authenticated" ON public.announcements;
-CREATE POLICY "announcements_read_authenticated" ON public.announcements FOR SELECT USING (auth.role() = 'authenticated');
+CREATE POLICY "announcements_read_authenticated" ON public.announcements
+  FOR SELECT USING (
+    auth.role() = 'authenticated'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE user_id = auth.uid() AND role IN ('admin', 'user')
+    )
+  );
 
 DROP POLICY IF EXISTS "announcements_write_admin" ON public.announcements;
 CREATE POLICY "announcements_write_admin" ON public.announcements FOR ALL USING (

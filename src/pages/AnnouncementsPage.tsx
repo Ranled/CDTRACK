@@ -1,10 +1,12 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import ReactDOM from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   Plus, Pin, PinOff, Trash2, Edit2, X, Save, Loader2, Megaphone,
-  AlertCircle, Image as ImageIcon, Eye, Calendar, Clock, ExternalLink
+  AlertCircle, Image as ImageIcon, Eye, Calendar, Clock, ExternalLink,
+  Lock, StickyNote, ShieldAlert
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
@@ -372,7 +374,7 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
 
 // ─── MAIN ANNOUNCEMENTS PAGE ───────────────────────────────────────────────
 export default function AnnouncementsPage() {
-  const { isAdmin, user } = useAuth()
+  const { user, isAdmin, isViewer } = useAuth()
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState<Announcement | null>(null)
@@ -380,6 +382,10 @@ export default function AnnouncementsPage() {
   const [loading, setLoading] = useState(true)
 
   const fetchAnnouncements = useCallback(async () => {
+    if (isViewer) {
+      setLoading(false)
+      return
+    }
     try {
       const { data } = await supabase
         .from('announcements')
@@ -390,7 +396,7 @@ export default function AnnouncementsPage() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [isViewer])
 
   useEffect(() => {
     fetchAnnouncements()
@@ -478,6 +484,38 @@ export default function AnnouncementsPage() {
       return updated.sort((a, b) => (b.is_pinned ? 1 : 0) - (a.is_pinned ? 1 : 0))
     })
     await supabase.from('announcements').update({ is_pinned: newPinned }).eq('id', ann.id)
+  }
+
+  // If viewer, display stylish restricted access screen
+  if (isViewer) {
+    return (
+      <div className="p-6 max-w-2xl mx-auto flex flex-col items-center justify-center min-h-[65vh] text-center">
+        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 mb-4 shadow-sm animate-scale-in">
+          <Lock className="w-10 h-10" />
+        </div>
+        <h1 className="text-xl font-bold text-foreground">Announcements Restricted</h1>
+        <p className="text-sm text-muted-foreground mt-2 max-w-md leading-relaxed">
+          Official section announcements and updates are restricted to verified Code Dreamers members and officers.
+          As a guest viewer, you have full read access to the Academic Calendar and Class Notes.
+        </p>
+        <div className="flex items-center gap-3 mt-6">
+          <Link
+            to="/calendar"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-700 active:scale-95 transition-all shadow-sm"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            View Calendar
+          </Link>
+          <Link
+            to="/notes"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary border border-border text-foreground text-xs font-semibold hover:bg-border active:scale-95 transition-all"
+          >
+            <StickyNote className="w-3.5 h-3.5" />
+            View Notes
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
