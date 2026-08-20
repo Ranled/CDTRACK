@@ -3,7 +3,8 @@ import ReactDOM from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
-  Plus, Search, Pin, PinOff, Trash2, Edit2, X, Save, Loader2, StickyNote, Eye
+  Plus, Search, Pin, PinOff, Trash2, Edit2, X, Save, Loader2, StickyNote, Eye,
+  Calendar, Clock, Maximize2
 } from 'lucide-react'
 import { cn, NOTE_COLORS, truncate } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
@@ -19,12 +20,11 @@ export interface Note {
   updated_at: string
 }
 
-// ─── FULL-VIEW READ MODAL (click a note card to open) ─────────────────────
+// ─── WINDOW-STYLE FULL VIEW MODAL ─────────────────────────────────────────
 interface NoteViewModalProps {
   note: Note
   getTextColor: (color: string) => string
   onClose: () => void
-  // Admin-only actions passed down so view modal can offer Edit/Delete
   onEdit?: () => void
   onDelete?: () => void
   isAdmin: boolean
@@ -44,90 +44,132 @@ function NoteViewModal({ note, getTextColor, onClose, onEdit, onDelete, isAdmin 
     return () => document.removeEventListener('keydown', handler)
   }, [onClose])
 
+  const textColor = getTextColor(note.color)
+
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
       style={{ isolation: 'isolate' }}
       role="dialog"
       aria-modal="true"
       aria-label={note.title}
     >
-      {/* Backdrop */}
+      {/* Dimmed backdrop */}
       <div
-        className="absolute inset-0 bg-black/55"
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
         onClick={onClose}
-        style={{ opacity: visible ? 1 : 0, transition: 'opacity 150ms ease', willChange: 'opacity' }}
+        style={{ opacity: visible ? 1 : 0, transition: 'opacity 180ms ease', willChange: 'opacity' }}
       />
 
-      {/* Panel */}
+      {/* Window-Style Container */}
       <div
-        className="relative rounded-2xl border border-border w-full max-w-lg overflow-hidden"
+        className="relative rounded-2xl border border-border/80 w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
         style={{
           backgroundColor: note.color,
-          maxHeight: '85dvh',
-          display: 'flex',
-          flexDirection: 'column',
-          transform: visible ? 'translateY(0) scale(1)' : 'translateY(18px) scale(0.97)',
+          transform: visible ? 'translateY(0) scale(1)' : 'translateY(24px) scale(0.96)',
           opacity: visible ? 1 : 0,
-          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 150ms ease',
+          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 180ms ease',
           willChange: 'transform, opacity',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(0,0,0,0.08)',
         }}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4 flex-shrink-0">
-          <div className="flex-1 min-w-0">
-            {note.pinned && (
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary mb-1.5">
-                <Pin className="w-2.5 h-2.5" /> PINNED
-              </span>
-            )}
-            <h2 className={cn('text-lg font-bold leading-snug', getTextColor(note.color))}>
-              {note.title}
-            </h2>
-            <p className={cn('text-[11px] mt-1 opacity-50 font-mono', getTextColor(note.color))}>
-              {format(parseISO(note.updated_at || note.created_at), 'MMMM d, yyyy · h:mm a')}
-            </p>
+        {/* Window Top Titlebar (OS-style) */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20 flex-shrink-0 select-none">
+          {/* Window control dots & title */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={onClose}
+                className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center group"
+                title="Close"
+              >
+                <X className="w-2 h-2 text-red-900 opacity-0 group-hover:opacity-100" />
+              </button>
+              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+              <div className="w-3 h-3 rounded-full bg-green-500/80" />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0 text-xs font-semibold opacity-75 truncate">
+              <StickyNote className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="truncate">Note View — {note.title}</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {/* Admin actions inside the view modal */}
+
+          {/* Right actions + Prominent X Close Button */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {isAdmin && onEdit && (
               <button
                 onClick={() => { onClose(); setTimeout(() => onEdit(), 80) }}
-                className={cn('p-1.5 rounded-lg hover:bg-black/10 transition-colors', getTextColor(note.color))}
+                className={cn('flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium hover:bg-black/10 dark:hover:bg-white/10 transition-colors', textColor)}
                 title="Edit note"
               >
-                <Edit2 className="w-4 h-4" />
+                <Edit2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Edit</span>
               </button>
             )}
             {isAdmin && onDelete && (
               <button
                 onClick={() => { onClose(); onDelete() }}
-                className="p-1.5 rounded-lg hover:bg-red-500/20 transition-colors text-red-600"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 hover:bg-red-500/20 transition-colors"
                 title="Delete note"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete</span>
               </button>
             )}
             <button
               onClick={onClose}
-              className={cn('p-1.5 rounded-lg hover:bg-black/10 transition-colors', getTextColor(note.color))}
-              title="Close"
+              className="p-1.5 rounded-lg hover:bg-black/15 dark:hover:bg-white/15 text-foreground/80 hover:text-foreground transition-colors ml-1"
+              aria-label="Close window"
+              title="Close window (Esc)"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Full content — scrollable */}
-        <div className="px-6 pb-6 overflow-y-auto flex-1">
-          {note.content ? (
-            <p className={cn('text-sm leading-relaxed whitespace-pre-wrap', getTextColor(note.color), 'opacity-90')}>
-              {note.content}
-            </p>
-          ) : (
-            <p className={cn('text-sm italic opacity-40', getTextColor(note.color))}>No content.</p>
-          )}
+        {/* Window Content Body */}
+        <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-4">
+          {/* Note Metadata Banner */}
+          <div className="space-y-2 border-b border-black/10 dark:border-white/10 pb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              {note.pinned && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-bold tracking-wide uppercase px-2.5 py-0.5 rounded-full bg-primary text-white shadow-sm">
+                  <Pin className="w-3 h-3" /> Pinned Note
+                </span>
+              )}
+              <span className={cn('text-xs opacity-60 font-mono flex items-center gap-1.5', textColor)}>
+                <Calendar className="w-3.5 h-3.5" />
+                {format(parseISO(note.updated_at || note.created_at), 'MMMM d, yyyy · h:mm a')}
+              </span>
+            </div>
+            <h1 className={cn('text-xl sm:text-2xl font-bold tracking-tight leading-snug', textColor)}>
+              {note.title}
+            </h1>
+          </div>
+
+          {/* Full Note Text */}
+          <div className="pt-2">
+            {note.content ? (
+              <div className={cn('text-sm sm:text-base leading-relaxed whitespace-pre-wrap font-normal', textColor, 'opacity-95')}>
+                {note.content}
+              </div>
+            ) : (
+              <p className={cn('text-sm italic opacity-40', textColor)}>This note has no written text.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Window Footer */}
+        <div className="px-6 py-3.5 border-t border-black/10 dark:border-white/10 bg-black/5 dark:bg-black/20 flex items-center justify-between flex-shrink-0">
+          <span className={cn('text-xs opacity-50 font-mono', textColor)}>
+            {note.content ? `${note.content.length} characters` : '0 characters'}
+          </span>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-black/10 hover:bg-black/20 dark:bg-white/10 dark:hover:bg-white/20 transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>,
@@ -180,12 +222,12 @@ function NoteModal({ note, onClose, onSave }: NoteModalProps) {
       aria-modal="true"
     >
       <div
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={() => { if (!saving) onClose() }}
         style={{ opacity: visible ? 1 : 0, transition: 'opacity 150ms ease', willChange: 'opacity' }}
       />
       <div
-        className="relative bg-background rounded-2xl shadow-panel w-full max-w-md border border-border"
+        className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg border border-border overflow-hidden"
         style={{
           transform: visible ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
           opacity: visible ? 1 : 0,
@@ -193,10 +235,14 @@ function NoteModal({ note, onClose, onSave }: NoteModalProps) {
           willChange: 'transform, opacity',
         }}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-base font-semibold text-foreground">
-            {note ? 'Edit Note' : 'New Note'}
-          </h2>
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/30">
+          <div className="flex items-center gap-2">
+            <StickyNote className="w-4 h-4 text-primary" />
+            <h2 className="text-base font-semibold text-foreground">
+              {note ? 'Edit Note' : 'New Note'}
+            </h2>
+          </div>
           <button type="button" onClick={onClose} disabled={saving}
             className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground">
             <X className="w-4 h-4" />
@@ -213,28 +259,28 @@ function NoteModal({ note, onClose, onSave }: NoteModalProps) {
           <div>
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Content</label>
             <textarea ref={contentRef} defaultValue={note?.content || ''}
-              className="cd-input min-h-[140px] resize-none" placeholder="Write your note here..." rows={6} />
+              className="cd-input min-h-[140px] resize-none" placeholder="Write your note details here..." rows={6} />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">Note Color</label>
+            <div className="flex items-center gap-2.5 flex-wrap">
               {NOTE_COLORS.map(nc => (
                 <button type="button" key={nc.value} onClick={() => setColor(nc.value)}
-                  className={cn('w-6 h-6 rounded-full border-2 transition-transform active:scale-95',
-                    color === nc.value ? 'border-primary scale-110 shadow-sm' : 'border-border')}
+                  className={cn('w-7 h-7 rounded-full border-2 transition-transform active:scale-95',
+                    color === nc.value ? 'border-primary scale-110 shadow-md ring-2 ring-primary/20' : 'border-border')}
                   style={{ backgroundColor: nc.value }} title={nc.name} />
               ))}
             </div>
           </div>
 
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label className="flex items-center gap-2.5 cursor-pointer select-none pt-1">
             <input type="checkbox" checked={pinned} onChange={e => setPinned(e.target.checked)}
               className="w-4 h-4 rounded border-border text-primary" />
-            <span className="text-sm text-foreground">Pin this note to the top</span>
+            <span className="text-sm font-medium text-foreground">Pin this note to the top</span>
           </label>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3 pt-3 border-t border-border">
             <button type="button" onClick={onClose} disabled={saving}
               className="flex-1 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-secondary transition-colors disabled:opacity-50">
               Cancel
@@ -262,7 +308,7 @@ export default function NotesPage() {
   const [viewingNote, setViewingNote] = useState<Note | null>(null)
   const [loading, setLoading]         = useState(true)
 
-  // ── Fetch ALL notes (centralised — not filtered by user_id) ──────────────
+  // ── Fetch ALL notes (centralised) ─────────────────────────────────────────
   const fetchNotes = useCallback(async () => {
     try {
       const { data } = await supabase
@@ -330,10 +376,9 @@ export default function NotesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Class Notes</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Shared notes visible to all members · click any note to read in full
+            Shared notes board · click any note card to open full-window view
           </p>
         </div>
-        {/* Only admins can create notes */}
         {isAdmin && (
           <button
             onClick={openCreate}
@@ -368,7 +413,7 @@ export default function NotesPage() {
             {searchQuery ? 'No notes match your search' : 'No notes yet'}
           </p>
           <p className="text-sm text-muted-foreground/60 mt-1">
-            {!searchQuery && isAdmin && 'Click "New Note" to add the first class note.'}
+            {!searchQuery && isAdmin && 'Click "New Note" to post the first note.'}
           </p>
         </div>
       ) : (
@@ -376,9 +421,8 @@ export default function NotesPage() {
           {filteredNotes.map(note => (
             <div
               key={note.id}
-              className="break-inside-avoid mb-4 rounded-xl border border-border shadow-card hover:shadow-card-hover transition-all duration-150 overflow-hidden group cursor-pointer"
+              className="break-inside-avoid mb-4 rounded-xl border border-border shadow-card hover:shadow-card-hover transition-all duration-150 overflow-hidden group cursor-pointer active:scale-[0.99]"
               style={{ backgroundColor: note.color }}
-              // Clicking the card body opens the full-view read modal
               onClick={() => setViewingNote(note)}
             >
               <div className="p-4 space-y-2">
@@ -388,7 +432,7 @@ export default function NotesPage() {
                     {note.title}
                   </h3>
 
-                  {/* Admin action buttons — stop propagation so they don't open the view modal */}
+                  {/* Admin action buttons */}
                   {isAdmin && (
                     <div
                       className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
@@ -433,10 +477,9 @@ export default function NotesPage() {
                   </p>
                 )}
 
-                {/* "Read more" hint when content is truncated */}
                 {note.content.length > 220 && (
-                  <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold opacity-60', getTextColor(note.color))}>
-                    <Eye className="w-3 h-3" /> Read more
+                  <span className={cn('inline-flex items-center gap-1 text-[10px] font-semibold opacity-60 pt-1', getTextColor(note.color))}>
+                    <Eye className="w-3 h-3" /> View full note
                   </span>
                 )}
 
@@ -449,7 +492,7 @@ export default function NotesPage() {
         </div>
       )}
 
-      {/* Full-view read modal — opens for everyone on card click */}
+      {/* Window-Style Full View Modal */}
       {viewingNote && (
         <NoteViewModal
           note={viewingNote}
@@ -461,7 +504,7 @@ export default function NotesPage() {
         />
       )}
 
-      {/* Edit / create modal — admin only */}
+      {/* Edit / create modal */}
       {showModal && (
         <NoteModal
           note={editingNote}

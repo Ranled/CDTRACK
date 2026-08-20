@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   Plus, Pin, PinOff, Trash2, Edit2, X, Save, Loader2, Megaphone,
-  AlertCircle, Image as ImageIcon, Eye
+  AlertCircle, Image as ImageIcon, Eye, Calendar, Clock, ExternalLink
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
@@ -20,7 +20,7 @@ export interface Announcement {
   created_at: string
 }
 
-// ─── FULL-VIEW READ MODAL (tap an announcement to open) ───────────────────
+// ─── WINDOW-STYLE FULL VIEW ANNOUNCEMENT MODAL ────────────────────────────
 interface AnnouncementViewModalProps {
   item: Announcement
   onClose: () => void
@@ -45,97 +45,139 @@ function AnnouncementViewModal({ item, onClose, onEdit, onDelete, isAdmin }: Ann
 
   return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6"
       style={{ isolation: 'isolate' }}
       role="dialog"
       aria-modal="true"
       aria-label={item.title}
     >
-      {/* Backdrop */}
+      {/* Dimmed backdrop */}
       <div
-        className="absolute inset-0 bg-black/60"
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm"
         onClick={onClose}
-        style={{ opacity: visible ? 1 : 0, transition: 'opacity 150ms ease', willChange: 'opacity' }}
+        style={{ opacity: visible ? 1 : 0, transition: 'opacity 180ms ease', willChange: 'opacity' }}
       />
 
-      {/* Panel */}
+      {/* Window-Style Container */}
       <div
-        className="relative bg-background rounded-2xl border border-border w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden shadow-panel"
+        className="relative bg-background rounded-2xl border border-border w-full max-w-2xl max-h-[90vh] sm:max-h-[85vh] flex flex-col overflow-hidden shadow-2xl"
         style={{
-          transform: visible ? 'translateY(0) scale(1)' : 'translateY(18px) scale(0.97)',
+          transform: visible ? 'translateY(0) scale(1)' : 'translateY(24px) scale(0.96)',
           opacity: visible ? 1 : 0,
-          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 150ms ease',
+          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 180ms ease',
           willChange: 'transform, opacity',
+          boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255,255,255,0.05)',
         }}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4 border-b border-border flex-shrink-0 bg-background">
-          <div className="flex-1 min-w-0 space-y-1.5">
-            <div className="flex items-center gap-2 flex-wrap">
-              {item.is_pinned && (
-                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-accent text-yellow-900 px-2 py-0.5 rounded-full">
-                  <Pin className="w-2.5 h-2.5" /> Pinned
-                </span>
-              )}
-              {item.is_important && (
-                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400 px-2 py-0.5 rounded-full">
-                  <AlertCircle className="w-2.5 h-2.5" /> Important
-                </span>
-              )}
+        {/* Window Top Titlebar (OS-style) */}
+        <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-b border-border bg-secondary/40 flex-shrink-0 select-none">
+          {/* Window control dots & title */}
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={onClose}
+                className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors flex items-center justify-center group"
+                title="Close"
+              >
+                <X className="w-2 h-2 text-red-900 opacity-0 group-hover:opacity-100" />
+              </button>
+              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+              <div className="w-3 h-3 rounded-full bg-green-500/80" />
             </div>
-            <h2 className="text-lg font-bold text-foreground leading-snug">
-              {item.title}
-            </h2>
-            <p className="text-xs text-muted-foreground/70 font-mono">
-              {item.created_at ? format(parseISO(item.created_at), 'MMMM d, yyyy · h:mm a') : ''}
-            </p>
+            <div className="flex items-center gap-1.5 min-w-0 text-xs font-semibold text-muted-foreground truncate">
+              <Megaphone className="w-3.5 h-3.5 text-primary flex-shrink-0" />
+              <span className="truncate">Announcement — {item.title}</span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Right actions + Prominent X Close Button */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
             {isAdmin && onEdit && (
               <button
                 onClick={() => { onClose(); setTimeout(() => onEdit(), 80) }}
-                className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 title="Edit announcement"
               >
-                <Edit2 className="w-4 h-4" />
+                <Edit2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Edit</span>
               </button>
             )}
             {isAdmin && onDelete && (
               <button
                 onClick={() => { onClose(); onDelete() }}
-                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-muted-foreground hover:text-red-600 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 dark:hover:bg-red-950 transition-colors"
                 title="Delete announcement"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Delete</span>
               </button>
             )}
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-              title="Close"
+              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors ml-1"
+              aria-label="Close window"
+              title="Close window (Esc)"
             >
-              <X className="w-4 h-4" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+        {/* Window Content Body */}
+        <div className="p-6 sm:p-8 overflow-y-auto flex-1 space-y-5">
+          {/* Badges & Meta */}
+          <div className="space-y-2.5 border-b border-border pb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              {item.is_pinned && (
+                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider bg-accent text-yellow-900 px-2.5 py-0.5 rounded-full shadow-sm">
+                  <Pin className="w-3 h-3" /> Pinned
+                </span>
+              )}
+              {item.is_important && (
+                <span className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400 px-2.5 py-0.5 rounded-full shadow-sm">
+                  <AlertCircle className="w-3 h-3" /> Important Notice
+                </span>
+              )}
+              <span className="text-xs text-muted-foreground font-mono flex items-center gap-1.5 ml-auto">
+                <Calendar className="w-3.5 h-3.5" />
+                {item.created_at ? format(parseISO(item.created_at), 'MMMM d, yyyy · h:mm a') : ''}
+              </span>
+            </div>
+
+            <h1 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight leading-snug">
+              {item.title}
+            </h1>
+          </div>
+
+          {/* Full High-Res Image (if available) */}
           {item.image_url && (
-            <div className="rounded-xl overflow-hidden bg-secondary/50 border border-border">
+            <div className="rounded-xl overflow-hidden bg-secondary/30 border border-border shadow-sm">
               <img
                 src={item.image_url}
                 alt={item.title}
-                className="w-full max-h-80 object-cover"
+                className="w-full max-h-[380px] object-cover"
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
               />
             </div>
           )}
 
-          <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+          {/* Full Description */}
+          <div className="text-sm sm:text-base text-foreground/90 leading-relaxed whitespace-pre-wrap font-normal">
             {item.description}
           </div>
+        </div>
+
+        {/* Window Footer */}
+        <div className="px-6 py-3.5 border-t border-border bg-secondary/20 flex items-center justify-between flex-shrink-0">
+          <span className="text-xs text-muted-foreground font-mono">
+            Code Dreamers Official Announcement
+          </span>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary-700 transition-colors shadow-sm"
+          >
+            Close
+          </button>
         </div>
       </div>
     </div>,
@@ -204,7 +246,7 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
       aria-modal="true"
     >
       <div
-        className="absolute inset-0 bg-black/50"
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={() => { if (!saving) onClose() }}
         style={{
           opacity: visible ? 1 : 0,
@@ -213,7 +255,7 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
         }}
       />
       <div
-        className="relative bg-background rounded-2xl shadow-panel w-full max-w-lg max-h-[90vh] overflow-y-scroll border border-border"
+        className="relative bg-background rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-scroll border border-border"
         style={{
           transform: visible ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.97)',
           opacity: visible ? 1 : 0,
@@ -222,9 +264,12 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
         }}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-border sticky top-0 bg-background z-10">
-          <h2 className="text-base font-semibold text-foreground">
-            {item ? 'Edit Announcement' : 'New Announcement'}
-          </h2>
+          <div className="flex items-center gap-2">
+            <Megaphone className="w-4 h-4 text-primary" />
+            <h2 className="text-base font-semibold text-foreground">
+              {item ? 'Edit Announcement' : 'New Announcement'}
+            </h2>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -278,7 +323,7 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-6 select-none">
+          <div className="flex items-center gap-6 select-none pt-1">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -286,7 +331,7 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
                 onChange={e => setIsPinned(e.target.checked)}
                 className="w-4 h-4 rounded border-border text-primary"
               />
-              <span className="text-sm text-foreground">Pin announcement</span>
+              <span className="text-sm font-medium text-foreground">Pin announcement</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
@@ -295,11 +340,11 @@ function AnnouncementModal({ item, onClose, onSave }: AnnouncementModalProps) {
                 onChange={e => setIsImportant(e.target.checked)}
                 className="w-4 h-4 rounded border-border text-primary"
               />
-              <span className="text-sm text-foreground">Mark as important</span>
+              <span className="text-sm font-medium text-foreground">Mark as important</span>
             </label>
           </div>
 
-          <div className="flex items-center gap-3 pt-2">
+          <div className="flex items-center gap-3 pt-3 border-t border-border">
             <button
               type="button"
               onClick={onClose}
@@ -435,7 +480,7 @@ export default function AnnouncementsPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Organization-wide announcements and updates · click any announcement to view in full
+            Organization-wide updates · click any announcement card to open full-window view
           </p>
         </div>
         {isAdmin && (
@@ -466,7 +511,7 @@ export default function AnnouncementsPage() {
               key={ann.id}
               onClick={() => setViewingItem(ann)}
               className={cn(
-                'cd-card transition-all duration-150 cursor-pointer hover:shadow-card-hover group',
+                'cd-card transition-all duration-150 cursor-pointer hover:shadow-card-hover group active:scale-[0.995]',
                 ann.is_pinned && 'border-accent ring-1 ring-accent/30'
               )}
             >
@@ -476,7 +521,7 @@ export default function AnnouncementsPage() {
                   <img
                     src={ann.image_url}
                     alt={ann.title}
-                    className="w-full h-48 object-cover"
+                    className="w-full h-48 object-cover group-hover:scale-[1.01] transition-transform duration-200"
                     loading="lazy"
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                   />
@@ -508,7 +553,7 @@ export default function AnnouncementsPage() {
 
                   <div className="flex items-center gap-3 pt-1">
                     <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
-                      <Eye className="w-3.5 h-3.5" /> View full announcement
+                      <Eye className="w-3.5 h-3.5" /> View full window
                     </span>
                     <span className="text-xs text-muted-foreground/60 font-mono">
                       {ann.created_at ? format(parseISO(ann.created_at), 'MMMM d, yyyy') : ''}
@@ -550,7 +595,7 @@ export default function AnnouncementsPage() {
         </div>
       )}
 
-      {/* Full-view Read Modal */}
+      {/* Window-Style Full View Modal */}
       {viewingItem && (
         <AnnouncementViewModal
           item={viewingItem}
