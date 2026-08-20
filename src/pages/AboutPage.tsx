@@ -1,5 +1,5 @@
 import React from 'react'
-import { Heart, Users, Crown } from 'lucide-react'
+import { Users, Crown } from 'lucide-react'
 
 const officers = [
   { name: 'Raian Lee Vallejo',       role: 'Mayor',      initials: 'RV' },
@@ -72,8 +72,8 @@ export default function AboutPage() {
         <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-semibold">
           Version 1.08.20
         </div>
-        <p className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-          Built with <Heart className="w-3 h-3 text-red-500" /> by Dev. Raian Lee D. Vallejo
+        <p className="text-xs text-muted-foreground">
+          Built & Developed by Raian Lee D. Vallejo
         </p>
         <p className="text-[10px] text-muted-foreground/60">
           Powered by React · TypeScript · TailwindCSS · Supabase
