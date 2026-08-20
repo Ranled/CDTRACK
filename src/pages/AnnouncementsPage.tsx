@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   Plus, Pin, PinOff, Trash2, Edit2, X, Save, Loader2, Megaphone,
-  AlertCircle, Image as ImageIcon
+  AlertCircle, Image as ImageIcon, Eye
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
@@ -18,6 +18,129 @@ export interface Announcement {
   is_important: boolean
   created_by: string
   created_at: string
+}
+
+// ─── FULL-VIEW READ MODAL (tap an announcement to open) ───────────────────
+interface AnnouncementViewModalProps {
+  item: Announcement
+  onClose: () => void
+  onEdit?: () => void
+  onDelete?: () => void
+  isAdmin: boolean
+}
+
+function AnnouncementViewModal({ item, onClose, onEdit, onDelete, isAdmin }: AnnouncementViewModalProps) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ isolation: 'isolate' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label={item.title}
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60"
+        onClick={onClose}
+        style={{ opacity: visible ? 1 : 0, transition: 'opacity 150ms ease', willChange: 'opacity' }}
+      />
+
+      {/* Panel */}
+      <div
+        className="relative bg-background rounded-2xl border border-border w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden shadow-panel"
+        style={{
+          transform: visible ? 'translateY(0) scale(1)' : 'translateY(18px) scale(0.97)',
+          opacity: visible ? 1 : 0,
+          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 150ms ease',
+          willChange: 'transform, opacity',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 px-6 pt-5 pb-4 border-b border-border flex-shrink-0 bg-background">
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              {item.is_pinned && (
+                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-accent text-yellow-900 px-2 py-0.5 rounded-full">
+                  <Pin className="w-2.5 h-2.5" /> Pinned
+                </span>
+              )}
+              {item.is_important && (
+                <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400 px-2 py-0.5 rounded-full">
+                  <AlertCircle className="w-2.5 h-2.5" /> Important
+                </span>
+              )}
+            </div>
+            <h2 className="text-lg font-bold text-foreground leading-snug">
+              {item.title}
+            </h2>
+            <p className="text-xs text-muted-foreground/70 font-mono">
+              {item.created_at ? format(parseISO(item.created_at), 'MMMM d, yyyy · h:mm a') : ''}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {isAdmin && onEdit && (
+              <button
+                onClick={() => { onClose(); setTimeout(() => onEdit(), 80) }}
+                className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                title="Edit announcement"
+              >
+                <Edit2 className="w-4 h-4" />
+              </button>
+            )}
+            {isAdmin && onDelete && (
+              <button
+                onClick={() => { onClose(); onDelete() }}
+                className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-muted-foreground hover:text-red-600 transition-colors"
+                title="Delete announcement"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+              title="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Scrollable Content */}
+        <div className="p-6 overflow-y-auto space-y-4 flex-1">
+          {item.image_url && (
+            <div className="rounded-xl overflow-hidden bg-secondary/50 border border-border">
+              <img
+                src={item.image_url}
+                alt={item.title}
+                className="w-full max-h-80 object-cover"
+                onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+              />
+            </div>
+          )}
+
+          <div className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+            {item.description}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
 }
 
 // ─── ISOLATED ANNOUNCEMENT MODAL ──────────────────────────────────────────
@@ -207,8 +330,8 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [showModal, setShowModal] = useState(false)
   const [editingItem, setEditingItem] = useState<Announcement | null>(null)
+  const [viewingItem, setViewingItem] = useState<Announcement | null>(null)
   const [loading, setLoading] = useState(true)
-  const [expanded, setExpanded] = useState<string | null>(null)
 
   const fetchAnnouncements = useCallback(async () => {
     try {
@@ -311,7 +434,9 @@ export default function AnnouncementsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Announcements</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">Organization-wide announcements and updates</p>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Organization-wide announcements and updates · click any announcement to view in full
+          </p>
         </div>
         {isAdmin && (
           <button
@@ -339,8 +464,9 @@ export default function AnnouncementsPage() {
           {announcements.map(ann => (
             <div
               key={ann.id}
+              onClick={() => setViewingItem(ann)}
               className={cn(
-                'cd-card transition-shadow duration-150',
+                'cd-card transition-all duration-150 cursor-pointer hover:shadow-card-hover group',
                 ann.is_pinned && 'border-accent ring-1 ring-accent/30'
               )}
             >
@@ -373,23 +499,17 @@ export default function AnnouncementsPage() {
                     )}
                   </div>
 
-                  <h3 className="text-base font-semibold text-foreground leading-tight">{ann.title}</h3>
-                  <p className={cn(
-                    'text-sm text-muted-foreground leading-relaxed',
-                    expanded !== ann.id && 'line-clamp-3'
-                  )}>
+                  <h3 className="text-base font-semibold text-foreground leading-tight group-hover:text-primary transition-colors">
+                    {ann.title}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed line-clamp-3">
                     {ann.description}
                   </p>
 
-                  <div className="flex items-center gap-3">
-                    {ann.description && ann.description.length > 200 && (
-                      <button
-                        onClick={() => setExpanded(expanded === ann.id ? null : ann.id)}
-                        className="text-xs text-primary hover:text-primary-700 font-medium transition-colors"
-                      >
-                        {expanded === ann.id ? 'Show less' : 'Read more'}
-                      </button>
-                    )}
+                  <div className="flex items-center gap-3 pt-1">
+                    <span className="inline-flex items-center gap-1 text-xs text-primary font-medium">
+                      <Eye className="w-3.5 h-3.5" /> View full announcement
+                    </span>
                     <span className="text-xs text-muted-foreground/60 font-mono">
                       {ann.created_at ? format(parseISO(ann.created_at), 'MMMM d, yyyy') : ''}
                     </span>
@@ -397,7 +517,10 @@ export default function AnnouncementsPage() {
                 </div>
 
                 {isAdmin && (
-                  <div className="flex items-center gap-1 flex-shrink-0">
+                  <div
+                    className="flex items-center gap-1 flex-shrink-0"
+                    onClick={e => e.stopPropagation()}
+                  >
                     <button
                       onClick={() => togglePin(ann)}
                       className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
@@ -425,6 +548,17 @@ export default function AnnouncementsPage() {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Full-view Read Modal */}
+      {viewingItem && (
+        <AnnouncementViewModal
+          item={viewingItem}
+          onClose={() => setViewingItem(null)}
+          isAdmin={isAdmin}
+          onEdit={isAdmin ? () => { setViewingItem(null); openEdit(viewingItem) } : undefined}
+          onDelete={isAdmin ? () => { setViewingItem(null); handleDelete(viewingItem.id) } : undefined}
+        />
       )}
 
       {/* Form Modal */}

@@ -200,9 +200,18 @@ CREATE POLICY "announcements_write_admin" ON public.announcements FOR ALL USING 
   EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
 );
 
--- NOTES: Users can only CRUD their own notes
+-- NOTES: All authenticated users can READ; only admins can INSERT/UPDATE/DELETE
 DROP POLICY IF EXISTS "notes_own" ON public.notes;
-CREATE POLICY "notes_own" ON public.notes FOR ALL USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "notes_read_all" ON public.notes;
+CREATE POLICY "notes_read_all" ON public.notes
+  FOR SELECT USING (auth.role() = 'authenticated');
+
+DROP POLICY IF EXISTS "notes_write_admin" ON public.notes;
+CREATE POLICY "notes_write_admin" ON public.notes
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
+  );
 
 -- REMINDERS: Users can only CRUD their own reminders
 DROP POLICY IF EXISTS "reminders_own" ON public.reminders;
