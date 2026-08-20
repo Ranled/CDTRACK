@@ -198,8 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const activeRole: UserRole = profile?.role || getRoleForUser(user)
-  const isAdmin = activeRole === 'admin' || user?.email?.toLowerCase().startsWith('cdadmin01@')
-  const isViewer = activeRole === 'viewer' || user?.email?.toLowerCase().startsWith('rlv0812@')
+  const isAdmin: boolean = Boolean(activeRole === 'admin' || user?.email?.toLowerCase().startsWith('cdadmin01@'))
+  const isViewer: boolean = Boolean(activeRole === 'viewer' || user?.email?.toLowerCase().startsWith('rlv0812@'))
 
   return (
     <AuthContext.Provider value={{
