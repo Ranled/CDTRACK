@@ -1,12 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, Sun, Moon, Menu, X, CheckCheck, Download, Share } from 'lucide-react'
+import {
+  Search, Bell, Sun, Moon, Menu, X, CheckCheck, Download, Share,
+  Smartphone, Laptop, CheckCircle2, Sparkles, ArrowRight
+} from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { cn, formatDate } from '@/lib/utils'
 import { format } from 'date-fns'
 import { useInstallPrompt } from '@/hooks/useInstallPrompt'
+import ReactDOM from 'react-dom'
 
 interface Notification {
   id: string
@@ -21,17 +25,162 @@ interface TopNavProps {
   onMenuToggle: () => void
 }
 
+// ─── INSTALL PWA MODAL (Appears if native 1-click prompt isn't directly triggered) ───
+interface InstallModalProps {
+  onClose: () => void
+  onTriggerInstall: () => void
+  canInstall: boolean
+  isIOS: boolean
+}
+
+function InstallModal({ onClose, onTriggerInstall, canInstall, isIOS }: InstallModalProps) {
+  const [visible, setVisible] = useState(false)
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setVisible(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ isolation: 'isolate' }}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        onClick={onClose}
+        style={{ opacity: visible ? 1 : 0, transition: 'opacity 180ms ease' }}
+      />
+
+      {/* Modal Window */}
+      <div
+        className="relative bg-background rounded-2xl border border-border w-full max-w-md overflow-hidden shadow-2xl"
+        style={{
+          transform: visible ? 'translateY(0) scale(1)' : 'translateY(20px) scale(0.96)',
+          opacity: visible ? 1 : 0,
+          transition: 'transform 220ms cubic-bezier(0.16,1,0.3,1), opacity 180ms ease',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-secondary/30">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 rounded-xl bg-primary/10 text-primary">
+              <Download className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-foreground">Install CD TRACK</h2>
+              <p className="text-xs text-muted-foreground">Add to your Phone or Computer</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-4">
+          {/* If native 1-click is available, offer immediate trigger */}
+          {canInstall && (
+            <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 text-center space-y-3">
+              <p className="text-sm font-semibold text-foreground">
+                Ready for 1-Click Installation!
+              </p>
+              <button
+                onClick={() => { onTriggerInstall(); onClose() }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary-700 active:scale-[0.98] transition-all shadow-sm"
+              >
+                <Download className="w-4 h-4" />
+                Install Now
+              </button>
+            </div>
+          )}
+
+          {/* Device Guide */}
+          <div className="space-y-3">
+            {/* iOS Guide */}
+            <div className="p-3.5 rounded-xl bg-secondary/40 border border-border space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                <Smartphone className="w-4 h-4 text-primary" />
+                iPhone / iPad (Safari)
+              </div>
+              <ol className="text-xs text-muted-foreground space-y-1.5 list-none pl-0">
+                <li className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">1</span>
+                  Tap the <Share className="w-3 h-3 text-blue-500 inline mx-0.5" /> Share icon in Safari.
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">2</span>
+                  Scroll down and tap <strong className="text-foreground">"Add to Home Screen"</strong>.
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0">3</span>
+                  Tap <strong className="text-foreground">"Add"</strong> at the top right.
+                </li>
+              </ol>
+            </div>
+
+            {/* Android & Desktop Guide */}
+            <div className="p-3.5 rounded-xl bg-secondary/40 border border-border space-y-2">
+              <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                <Laptop className="w-4 h-4 text-primary" />
+                Android & Desktop (Chrome / Edge)
+              </div>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Click the <strong className="text-foreground">Install</strong> icon in your browser address bar (top right) or tap the browser menu (⋮) → <strong className="text-foreground">"Install CD TRACK"</strong>.
+              </p>
+            </div>
+          </div>
+
+          {/* Benefits */}
+          <div className="pt-2 border-t border-border space-y-1.5">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">App Benefits</p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> Fast Offline Access</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> Full-Screen App Mode</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> 3h Deadline Alarms</span>
+              <span className="flex items-center gap-1.5"><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> Instant Updates</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-border bg-secondary/20 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 text-xs font-semibold rounded-lg bg-secondary hover:bg-border text-foreground transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ─── MAIN TOPNAV COMPONENT ────────────────────────────────────────────────
 export default function TopNav({ onMenuToggle }: TopNavProps) {
   const { theme, toggleTheme } = useTheme()
   const { user } = useAuth()
   const navigate = useNavigate()
   const [showNotifs, setShowNotifs] = useState(false)
+  const [showInstallModal, setShowInstallModal] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
-  const [showIOSTip, setShowIOSTip] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
-  const installRef = useRef<HTMLDivElement>(null)
   const { canInstall, isIOS, isInstalled, triggerInstall } = useInstallPrompt()
 
   const currentMonth = format(new Date(), 'MMMM yyyy')
@@ -80,9 +229,6 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setShowNotifs(false)
       }
-      if (installRef.current && !installRef.current.contains(e.target as Node)) {
-        setShowIOSTip(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -108,6 +254,14 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
     }
   }
 
+  const handleInstallClick = () => {
+    if (canInstall) {
+      triggerInstall()
+    } else {
+      setShowInstallModal(true)
+    }
+  }
+
   const notifTypeDot: Record<string, string> = {
     announcement: 'bg-yellow-400',
     deadline: 'bg-red-400',
@@ -118,24 +272,24 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
   }
 
   return (
-    <header className="h-16 bg-background border-b border-border flex items-center px-4 gap-4 sticky top-0 z-30">
+    <header className="h-16 bg-background border-b border-border flex items-center px-4 gap-3 sm:gap-4 sticky top-0 z-30">
       {/* Mobile menu toggle */}
       <button
         onClick={onMenuToggle}
-        className="lg:hidden p-2 rounded-lg hover:bg-secondary text-muted-foreground"
+        className="lg:hidden p-2 rounded-lg hover:bg-secondary text-muted-foreground flex-shrink-0"
       >
         <Menu className="w-5 h-5" />
       </button>
 
       {/* Current month */}
-      <div className="hidden sm:block">
+      <div className="hidden md:block flex-shrink-0">
         <span className="text-sm font-semibold text-foreground">{currentMonth}</span>
       </div>
 
       {/* Global Search */}
-      <form onSubmit={handleSearch} className="flex-1 max-w-md mx-auto">
+      <form onSubmit={handleSearch} className="flex-1 max-w-md mx-2 sm:mx-4">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
@@ -148,7 +302,7 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
-        {/* Dark mode */}
+        {/* Dark / Light Mode Switch */}
         <button
           onClick={toggleTheme}
           className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all duration-150 flex items-center justify-center flex-shrink-0"
@@ -158,46 +312,20 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
           {theme === 'dark' ? <Sun className="w-[18px] h-[18px] text-amber-500" /> : <Moon className="w-[18px] h-[18px]" />}
         </button>
 
-        {/* Install App button — auto-hides when already installed or not installable */}
-        {!isInstalled && (canInstall || isIOS) && (
-          <div ref={installRef} className="relative">
-            <button
-              onClick={isIOS ? () => setShowIOSTip(v => !v) : triggerInstall}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.97] transition-all duration-150"
-              title="Install CD TRACK"
-            >
-              {isIOS
-                ? <Share className="w-3.5 h-3.5" />
-                : <Download className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">Install</span>
-            </button>
-
-            {/* iOS manual-instruction tooltip */}
-            {isIOS && showIOSTip && (
-              <div className="absolute right-0 top-full mt-2 w-64 bg-background border border-border rounded-xl shadow-panel p-4 z-50 animate-scale-in">
-                <p className="text-xs font-semibold text-foreground mb-2">Add to Home Screen</p>
-                <ol className="text-xs text-muted-foreground space-y-2 list-none">
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
-                    Tap the <Share className="w-3.5 h-3.5 inline mx-1 text-blue-500" /> Share button at the bottom of Safari
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
-                    Scroll down and tap <strong className="text-foreground">"Add to Home Screen"</strong>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
-                    Tap <strong className="text-foreground">"Add"</strong> — done!
-                  </li>
-                </ol>
-                <p className="text-[10px] text-muted-foreground/60 mt-3">Must be opened in Safari (not Chrome) on iOS.</p>
-              </div>
-            )}
-          </div>
+        {/* 1-CLICK EASY INSTALL BUTTON — ALWAYS VISIBLE BESIDE DARK/LIGHT MODE */}
+        {!isInstalled && (
+          <button
+            onClick={handleInstallClick}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary-700 active:scale-[0.97] transition-all duration-150 shadow-sm flex-shrink-0"
+            title="Install CD TRACK App to Home Screen"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Install</span>
+          </button>
         )}
 
         {/* Notifications */}
-        <div ref={notifRef} className="relative">
+        <div ref={notifRef} className="relative flex-shrink-0">
           <button
             onClick={() => setShowNotifs(!showNotifs)}
             className="relative p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all duration-150"
@@ -253,7 +381,7 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground truncate mt-0.5">{notif.body}</p>
-                          <p className="text-[10px] text-muted-foreground/60 mt-1">
+                          <p className="text-[10px] text-muted-foreground/60 mt-1 font-mono">
                             {format(new Date(notif.created_at), 'MMM d, h:mm a')}
                           </p>
                         </div>
@@ -266,6 +394,16 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
           )}
         </div>
       </div>
+
+      {/* Install Modal */}
+      {showInstallModal && (
+        <InstallModal
+          onClose={() => setShowInstallModal(false)}
+          onTriggerInstall={triggerInstall}
+          canInstall={canInstall}
+          isIOS={isIOS}
+        />
+      )}
     </header>
   )
 }
