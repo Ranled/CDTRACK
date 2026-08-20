@@ -9,11 +9,11 @@ const VIEWER_CODE = 'RLV0812'
 
 export type UserRole = 'admin' | 'user' | 'viewer'
 
-// Each code maps to a single shared Supabase account
-const CODE_CREDENTIALS: Record<string, { email: string; password: string; role: UserRole; displayName: string }> = {
-  [USER_CODE]:   { email: 'cd01@cdtrack.local',      password: 'cdtrack-cd01-shared',      role: 'user',   displayName: 'CD Member' },
-  [ADMIN_CODE]:  { email: 'cdadmin01@cdtrack.local',  password: 'cdtrack-cdadmin01-shared', role: 'admin',  displayName: 'CD Admin'  },
-  [VIEWER_CODE]: { email: 'rlv0812@cdtrack.local',   password: 'cdtrack-rlv0812-shared',   role: 'viewer', displayName: 'Guest Viewer' },
+// Each code maps to a single shared Supabase account (with standard valid .com email format)
+const CODE_CREDENTIALS: Record<string, { email: string; fallbackEmail: string; password: string; role: UserRole; displayName: string }> = {
+  [USER_CODE]:   { email: 'cd01@cdtrack.com',      fallbackEmail: 'cd01@cdtrack.local',      password: 'cdtrack-cd01-shared',      role: 'user',   displayName: 'CD Member' },
+  [ADMIN_CODE]:  { email: 'cdadmin01@cdtrack.com',  fallbackEmail: 'cdadmin01@cdtrack.local',  password: 'cdtrack-cdadmin01-shared', role: 'admin',  displayName: 'CD Admin'  },
+  [VIEWER_CODE]: { email: 'rlv0812@cdtrack.com',   fallbackEmail: 'rlv0812@cdtrack.local',   password: 'cdtrack-rlv0812-shared',   role: 'viewer', displayName: 'Guest Viewer' },
 }
 
 export interface Profile {
@@ -46,18 +46,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // Resilient prefix matching for role resolution
   const getRoleForUser = (u: User | null): UserRole => {
-    if (u?.email === 'cdadmin01@cdtrack.local') return 'admin'
-    if (u?.email === 'rlv0812@cdtrack.local') return 'viewer'
+    const email = u?.email?.toLowerCase() || ''
+    if (email.startsWith('cdadmin01@')) return 'admin'
+    if (email.startsWith('rlv0812@')) return 'viewer'
     return 'user'
   }
 
   const fetchProfile = useCallback(async (userId: string, userObj?: User | null) => {
-    const targetEmail = userObj?.email
+    const email = userObj?.email?.toLowerCase() || ''
     const expectedRole: UserRole =
-      targetEmail === 'cdadmin01@cdtrack.local'
+      email.startsWith('cdadmin01@')
         ? 'admin'
-        : targetEmail === 'rlv0812@cdtrack.local'
+        : email.startsWith('rlv0812@')
         ? 'viewer'
         : 'user'
     const expectedName =
@@ -136,20 +138,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [fetchProfile])
 
-  // Universal sign-in: supports CDADMIN01, CD01, and RLV0812
+  // Universal sign-in: supports CDADMIN01, CD01, and RLV0812 with resilient fallback
   const signInWithCode = async (code: string): Promise<{ error: string | null }> => {
     const creds = CODE_CREDENTIALS[code.trim().toUpperCase()]
     if (!creds) return { error: 'Invalid access code. Please check and try again.' }
 
-    // First try sign-in
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    // 1. Try primary .com email
+    let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: creds.email,
       password: creds.password,
     })
 
+    // 2. If failed, try legacy .local fallback
+    if (signInError && creds.fallbackEmail) {
+      const fallbackAttempt = await supabase.auth.signInWithPassword({
+        email: creds.fallbackEmail,
+        password: creds.password,
+      })
+      if (!fallbackAttempt.error) {
+        signInData = fallbackAttempt.data
+        signInError = null
+      }
+    }
+
     let activeUser = signInData?.user ?? null
 
-    // Auto-provision user account on Supabase if it doesn't exist yet!
+    // 3. Auto-provision user account on Supabase if not yet registered!
     if (signInError && signInError.message.toLowerCase().includes('invalid login credentials')) {
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: creds.email,
@@ -164,10 +178,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!signUpError && signUpData?.user) {
         activeUser = signUpData.user
       } else if (signUpError) {
-        return { error: `Sign-in error: ${signUpError.message}.` }
+        return { error: `Sign-in error: ${signUpError.message}` }
       }
     } else if (signInError) {
-      return { error: `Sign-in error: ${signInError.message}.` }
+      return { error: `Sign-in error: ${signInError.message}` }
     }
 
     if (activeUser) {
@@ -184,8 +198,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const activeRole: UserRole = profile?.role || getRoleForUser(user)
-  const isAdmin = activeRole === 'admin' || user?.email === 'cdadmin01@cdtrack.local'
-  const isViewer = activeRole === 'viewer' || user?.email === 'rlv0812@cdtrack.local'
+  const isAdmin = activeRole === 'admin' || user?.email?.toLowerCase().startsWith('cdadmin01@')
+  const isViewer = activeRole === 'viewer' || user?.email?.toLowerCase().startsWith('rlv0812@')
 
   return (
     <AuthContext.Provider value={{
