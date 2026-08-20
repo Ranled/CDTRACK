@@ -175,10 +175,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       })
-      if (!signUpError && signUpData?.user) {
-        activeUser = signUpData.user
-      } else if (signUpError) {
+
+      if (signUpError) {
         return { error: `Sign-in error: ${signUpError.message}` }
+      }
+
+      // Try signing in immediately after sign up
+      const reSignIn = await supabase.auth.signInWithPassword({
+        email: creds.email,
+        password: creds.password,
+      })
+
+      if (reSignIn.data?.user) {
+        activeUser = reSignIn.data.user
+        setSession(reSignIn.data.session)
+      } else if (reSignIn.error && reSignIn.error.message.toLowerCase().includes('email not confirmed')) {
+        return {
+          error: 'Account created but requires email confirmation in Supabase Dashboard (or run the provided SQL script to confirm).'
+        }
+      } else if (signUpData?.user) {
+        activeUser = signUpData.user
+        if (signUpData.session) setSession(signUpData.session)
       }
     } else if (signInError) {
       return { error: `Sign-in error: ${signInError.message}` }
