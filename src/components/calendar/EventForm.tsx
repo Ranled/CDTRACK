@@ -5,7 +5,10 @@ import { useAuth } from '@/contexts/AuthContext'
 import { X, Calendar, Clock, MapPin, Save, Loader2 } from 'lucide-react'
 import { ALL_CATEGORIES } from '@/lib/utils'
 
-const COURSES = ['OS101', 'HCI101', 'SP101', 'NC101', 'THS102']
+const COURSES = [
+  'OS101', 'HCI101', 'SP101', 'NC101', 'THS102',
+  'CS101', 'CS102', 'IAS101', 'AL101', 'SE101', 'CC101', 'EM101'
+]
 
 interface EventData {
   id?: string
@@ -112,9 +115,8 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
       created_by  : user.id,
     }
 
-    // Include course only if selected (graceful — column may not exist in all deployments)
-    const courseVal = courseRef.current?.value || null
-    if (courseVal) payload.course = courseVal
+    const courseVal = courseRef.current?.value ? courseRef.current.value.trim() : null
+    payload.course = courseVal
 
     // Returns the saved row in ONE round-trip via .select().single().
     // No separate re-fetch is needed — the parent receives the row directly.

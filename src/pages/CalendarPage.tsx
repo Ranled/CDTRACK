@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import {
   ChevronLeft, ChevronRight, Plus, X, Edit2, Trash2,
-  MapPin, Clock, Tag, AlertCircle, Filter, GraduationCap
+  MapPin, Clock, Tag, AlertCircle, Filter, GraduationCap,
+  Sparkles, CheckCircle2
 } from 'lucide-react'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
@@ -13,7 +14,7 @@ import {
 import { cn, CATEGORY_COLORS, CATEGORY_DOT_COLORS, ALL_CATEGORIES, getPriorityColor, formatTime } from '@/lib/utils'
 import EventForm from '@/components/calendar/EventForm'
 
-interface CalEvent {
+export interface CalEvent {
   id: string
   title: string
   description: string | null
@@ -74,23 +75,23 @@ const DayCell = memo(({ day, isCurrentMonth, isTodayDate, dayEvents, onEventClic
           key={event.id}
           onClick={() => onEventClick(event)}
           className={cn(
-            'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate hover:opacity-80 active:scale-[0.97] flex items-center gap-1',
+            'w-full text-left px-1.5 py-0.5 rounded text-[10px] font-medium truncate hover:opacity-80 active:scale-[0.97] flex items-center gap-1 shadow-2xs',
             colors(event.category).bg,
             colors(event.category).text
           )}
           title={event.course ? `[${event.course}] ${event.title}` : event.title}
         >
-          {event.course && (
-            <span className="font-bold opacity-90 px-1 rounded bg-black/10 dark:bg-white/20 text-[9px] flex-shrink-0 font-mono">
+          {event.course ? (
+            <span className="font-bold opacity-95 px-1 py-0.2 rounded bg-black/15 dark:bg-white/20 text-[9px] flex-shrink-0 font-mono tracking-tight">
               {event.course}
             </span>
-          )}
+          ) : null}
           {event.time && <span className="opacity-70 flex-shrink-0">{formatTime(event.time).replace(' AM', 'a').replace(' PM', 'p')} </span>}
-          <span className="truncate">{event.title}</span>
+          <span className="truncate font-medium">{event.title}</span>
         </button>
       ))}
       {dayEvents.length > 3 && (
-        <div className="text-[10px] text-muted-foreground px-1">+{dayEvents.length - 3} more</div>
+        <div className="text-[10px] text-muted-foreground px-1 font-medium">+{dayEvents.length - 3} more</div>
       )}
     </div>
   </div>
@@ -191,6 +192,8 @@ export default function CalendarPage() {
   const handleFormSave = useCallback((savedEvent: CalEvent) => {
     setShowForm(false)
     setEditingEvent(null)
+    // Synchronously update selectedEvent so drawer updates immediately
+    setSelectedEvent(prev => (prev && prev.id === savedEvent.id ? savedEvent : prev))
     setEvents(prev => {
       if (editingEvent?.id) {
         return prev.map(e => e.id === savedEvent.id ? savedEvent : e)
@@ -341,18 +344,26 @@ export default function CalendarPage() {
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0 space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
+                    {/* Category pill */}
                     <span className={cn('text-[10px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-sm', getColors(selectedEvent.category).bg, getColors(selectedEvent.category).text)}>
                       {selectedEvent.category}
                     </span>
-                    {selectedEvent.course && (
-                      <span className="text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 flex items-center gap-1 shadow-sm">
-                        <GraduationCap className="w-3 h-3" />
-                        {selectedEvent.course}
-                      </span>
-                    )}
+
+                    {/* Course Badge — ALWAYS displayed! */}
+                    <span className={cn(
+                      'text-[10px] font-bold font-mono px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-sm',
+                      selectedEvent.course
+                        ? 'bg-primary/15 text-primary border border-primary/25'
+                        : 'bg-secondary text-muted-foreground border border-border'
+                    )}>
+                      <GraduationCap className="w-3 h-3 text-primary" />
+                      {selectedEvent.course ? selectedEvent.course : 'General'}
+                    </span>
                   </div>
+
                   <h2 className="text-xl font-bold text-foreground leading-snug">{selectedEvent.title}</h2>
                 </div>
+
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {isAdmin && (
                     <>
@@ -384,21 +395,42 @@ export default function CalendarPage() {
 
               {/* Detail Items */}
               <div className="space-y-3.5 pt-2">
-                {/* Course subject (prominent card if present) */}
-                {selectedEvent.course && (
-                  <div className="flex items-center gap-3 p-3 rounded-xl bg-primary/5 border border-primary/15 text-sm">
-                    <div className="p-2 rounded-lg bg-primary/10 text-primary flex-shrink-0">
+                {/* Dedicated Course Subject Card — ALWAYS VISIBLE! */}
+                <div className={cn(
+                  'flex items-center justify-between gap-3 p-3.5 rounded-xl border text-sm',
+                  selectedEvent.course
+                    ? 'bg-primary/5 border-primary/20 text-primary'
+                    : 'bg-secondary/40 border-border text-muted-foreground'
+                )}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={cn(
+                      'p-2 rounded-lg flex-shrink-0',
+                      selectedEvent.course ? 'bg-primary/15 text-primary' : 'bg-secondary text-muted-foreground'
+                    )}>
                       <GraduationCap className="w-4 h-4" />
                     </div>
-                    <div>
-                      <span className="text-[11px] font-semibold text-primary uppercase tracking-wider block">Course Subject</span>
-                      <span className="text-foreground font-mono font-bold text-sm">
-                        {selectedEvent.course}
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-bold uppercase tracking-wider block opacity-75">
+                        Course Subject
+                      </span>
+                      <span className="text-foreground font-mono font-bold text-sm truncate block">
+                        {selectedEvent.course ? selectedEvent.course : 'None Assigned (General)'}
                       </span>
                     </div>
                   </div>
-                )}
 
+                  {/* Quick Edit shortcut if no course assigned */}
+                  {isAdmin && !selectedEvent.course && (
+                    <button
+                      onClick={handleOpenEdit}
+                      className="text-[11px] font-semibold text-primary hover:underline flex-shrink-0 px-2.5 py-1 rounded-lg bg-primary/10 transition-colors"
+                    >
+                      + Assign Course
+                    </button>
+                  )}
+                </div>
+
+                {/* Date and Time */}
                 <div className="flex items-center gap-3 text-sm">
                   <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <div>
@@ -414,6 +446,7 @@ export default function CalendarPage() {
                   </div>
                 </div>
 
+                {/* Location */}
                 {selectedEvent.location && (
                   <div className="flex items-center gap-3 text-sm">
                     <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -421,6 +454,7 @@ export default function CalendarPage() {
                   </div>
                 )}
 
+                {/* Priority */}
                 <div className="flex items-center gap-3 text-sm">
                   <AlertCircle className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span className={cn('text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize', getPriorityColor(selectedEvent.priority))}>
@@ -428,6 +462,7 @@ export default function CalendarPage() {
                   </span>
                 </div>
 
+                {/* Status */}
                 <div className="flex items-center gap-3 text-sm">
                   <Tag className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                   <span className={cn(
@@ -459,7 +494,7 @@ export default function CalendarPage() {
         </>
       )}
 
-      {/* Event Form Modal — only mounted when needed */}
+      {/* Event Form Modal */}
       {showForm && (
         <EventForm
           event={editingEvent}
