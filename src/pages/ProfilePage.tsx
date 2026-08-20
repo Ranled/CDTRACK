@@ -109,25 +109,34 @@ export default function ProfilePage() {
         <h3 className="text-sm font-semibold text-foreground">Preferences</h3>
 
         {/* Dark mode */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-4 py-1">
           <div className="flex items-center gap-3">
-            {theme === 'dark' ? <Moon className="w-4 h-4 text-muted-foreground" /> : <Sun className="w-4 h-4 text-muted-foreground" />}
+            <div className="p-2 rounded-lg bg-secondary text-muted-foreground">
+              {theme === 'dark' ? <Moon className="w-4 h-4 text-primary" /> : <Sun className="w-4 h-4 text-amber-500" />}
+            </div>
             <div>
               <p className="text-sm font-medium text-foreground">Dark Mode</p>
               <p className="text-xs text-muted-foreground">{theme === 'dark' ? 'Currently using dark theme' : 'Currently using light theme'}</p>
             </div>
           </div>
           <button
+            type="button"
+            role="switch"
+            aria-checked={theme === 'dark'}
             onClick={toggleTheme}
             className={cn(
-              'relative w-11 h-6 rounded-full transition-colors duration-300',
-              theme === 'dark' ? 'bg-primary' : 'bg-border'
+              'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+              theme === 'dark' ? 'bg-primary' : 'bg-neutral-300 dark:bg-neutral-700'
             )}
           >
-            <span className={cn(
-              'absolute top-1 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-300',
-              theme === 'dark' ? 'translate-x-6' : 'translate-x-1'
-            )} />
+            <span className="sr-only">Toggle Dark Mode</span>
+            <span
+              aria-hidden="true"
+              className={cn(
+                'pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out',
+                theme === 'dark' ? 'translate-x-5' : 'translate-x-0'
+              )}
+            />
           </button>
         </div>
 
