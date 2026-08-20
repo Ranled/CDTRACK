@@ -38,6 +38,10 @@ const CATEGORY_LEGEND = [
   { key: 'meeting', label: 'Meetings' },
 ]
 
+// Module-level pure lookups — no useCallback needed (constant object, no closure)
+const getColors   = (cat: string) => CATEGORY_COLORS[cat]    || CATEGORY_COLORS['custom']
+const getDotColor = (cat: string) => CATEGORY_DOT_COLORS[cat] || '#6B7280'
+
 // --- Memoized Day Cell ---
 interface DayCellProps {
   day: Date
@@ -168,23 +172,29 @@ export default function CalendarPage() {
     await supabase.from('events').delete().eq('id', id)
   }, [])
 
-  const colors = useCallback((cat: string) => CATEGORY_COLORS[cat] || CATEGORY_COLORS['custom'], [])
-  const dotColor = useCallback((cat: string) => CATEGORY_DOT_COLORS[cat] || '#6B7280', [])
-
   const handleEventClick = useCallback((event: CalEvent) => setSelectedEvent(event), [])
 
   const handleOpenCreate = useCallback(() => { setEditingEvent(null); setShowForm(true) }, [])
   const handleOpenEdit = useCallback(() => { setEditingEvent(selectedEvent); setShowForm(true) }, [selectedEvent])
   const handleFormClose = useCallback(() => { setShowForm(false); setEditingEvent(null) }, [])
-  const handleFormSave = useCallback(() => {
+  
+  const handleFormSave = useCallback((savedEvent: CalEvent) => {
     setShowForm(false)
     setEditingEvent(null)
-    fetchEvents()
-  }, [fetchEvents])
+    setEvents(prev => {
+      if (editingEvent?.id) {
+        return prev.map(e => e.id === savedEvent.id ? savedEvent : e)
+      }
+      return [...prev, savedEvent].sort((a, b) =>
+        a.date === b.date
+          ? (a.time ?? '').localeCompare(b.time ?? '')
+          : a.date.localeCompare(b.date)
+      )
+    })
+  }, [editingEvent])
 
   return (
     <div className="flex h-[calc(100vh-64px)] overflow-hidden">
-      {/* Main calendar area */}
       <div className="flex-1 flex flex-col p-6 overflow-hidden">
         {/* Calendar header */}
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
@@ -253,11 +263,11 @@ export default function CalendarPage() {
                 className={cn(
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150',
                   activeFilters.includes(cat)
-                    ? cn(colors(cat).bg, colors(cat).text, 'border-transparent')
+                    ? cn(getColors(cat).bg, getColors(cat).text, 'border-transparent')
                     : 'border-border text-muted-foreground hover:bg-secondary'
                 )}
               >
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: dotColor(cat) }} />
+                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: getDotColor(cat) }} />
                 {cat.charAt(0).toUpperCase() + cat.slice(1)}
               </button>
             ))}
@@ -276,7 +286,7 @@ export default function CalendarPage() {
         <div className="flex flex-wrap items-center gap-3 mb-4 flex-shrink-0">
           {CATEGORY_LEGEND.map(item => (
             <div key={item.key} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full" style={{ background: dotColor(item.key) }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: getDotColor(item.key) }} />
               <span className="text-xs text-muted-foreground">{item.label}</span>
             </div>
           ))}
@@ -304,7 +314,7 @@ export default function CalendarPage() {
                 isTodayDate={isToday(day)}
                 dayEvents={getEventsForDay(day)}
                 onEventClick={handleEventClick}
-                colors={colors}
+                colors={getColors}
               />
             ))}
           </div>
@@ -319,7 +329,7 @@ export default function CalendarPage() {
             <div className="p-5 space-y-5">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
-                  <span className={cn('text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full', colors(selectedEvent.category).bg, colors(selectedEvent.category).text)}>
+                  <span className={cn('text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full', getColors(selectedEvent.category).bg, getColors(selectedEvent.category).text)}>
                     {selectedEvent.category}
                   </span>
                   <h2 className="text-lg font-bold text-foreground mt-2 leading-tight">{selectedEvent.title}</h2>

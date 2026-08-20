@@ -24,7 +24,9 @@ interface EventData {
 interface EventFormProps {
   event?: EventData | null
   onClose: () => void
-  onSave: () => void
+  // Carries the full DB row (including DB-generated id, created_at, created_by)
+  // so the parent can do an optimistic update without firing a second network request.
+  onSave: (savedEvent: EventData & { id: string; created_at: string; created_by: string }) => void
 }
 
 // Shared label style
@@ -114,25 +116,29 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
     const courseVal = courseRef.current?.value || null
     if (courseVal) payload.course = courseVal
 
+    // Returns the saved row in ONE round-trip via .select().single().
+    // No separate re-fetch is needed — the parent receives the row directly.
     const tryInsertOrUpdate = async (data: Record<string, unknown>) => {
       if (event?.id) {
         // Don't overwrite created_by on updates
         const { created_by: _omit, ...updateData } = data
-        return supabase.from('events').update(updateData).eq('id', event.id!)
+        return supabase
+          .from('events')
+          .update(updateData)
+          .eq('id', event.id!)
+          .select()
+          .single()
       } else {
-        return supabase.from('events').insert(data)
+        return supabase
+          .from('events')
+          .insert(data)
+          .select()
+          .single()
       }
     }
 
     try {
-      let { error: dbError } = await tryInsertOrUpdate(payload)
-
-      // If the error mentions 'course', that column doesn't exist — retry without it
-      if (dbError && dbError.message?.toLowerCase().includes('course')) {
-        const { course: _omit, ...payloadWithoutCourse } = payload
-        const result = await tryInsertOrUpdate(payloadWithoutCourse)
-        dbError = result.error
-      }
+      const { data: savedRow, error: dbError } = await tryInsertOrUpdate(payload)
 
       if (dbError) {
         setError(dbError.message)
@@ -140,8 +146,9 @@ export default function EventForm({ event, onClose, onSave }: EventFormProps) {
         return
       }
 
-      // Success — onSave() will close form and refresh events list
-      onSave()
+      // Pass the real DB row back so the parent can update local state instantly
+      // (zero additional network calls required)
+      onSave(savedRow)
     } catch (ex: unknown) {
       setError(ex instanceof Error ? ex.message : 'Unexpected error. Please try again.')
       setLoading(false)

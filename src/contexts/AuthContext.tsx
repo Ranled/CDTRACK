@@ -49,8 +49,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const fetchProfile = useCallback(async (userId: string, userObj?: User | null) => {
-    const activeUser = userObj || user
-    const targetEmail = activeUser?.email
+    // Use the passed-in userObj exclusively — never the outer 'user' state.
+    // This keeps fetchProfile referentially stable (empty dep array),
+    // which prevents onAuthStateChange from being re-registered on every login.
+    const targetEmail = userObj?.email
     const expectedRole: UserRole = targetEmail === 'cdadmin01@cdtrack.local' ? 'admin' : 'user'
     const expectedName = expectedRole === 'admin' ? 'CD Admin' : 'CD Member'
 
@@ -90,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(fallbackProfile)
       return fallbackProfile
     }
-  }, [user])
+  }, [])  // ✔ Stable reference: no outer state captured — onAuthStateChange registers once
 
   const refreshProfile = useCallback(async () => {
     if (user) await fetchProfile(user.id, user)

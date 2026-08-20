@@ -241,6 +241,23 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON public.notifications(use
 CREATE INDEX IF NOT EXISTS idx_profiles_user_id ON public.profiles(user_id);
 CREATE INDEX IF NOT EXISTS idx_announcements_pinned ON public.announcements(is_pinned, created_at DESC);
 
+-- Composite: covers RLS subquery "WHERE user_id = X AND role = 'admin'"
+-- Turns every event/announcement write from a heap-fetch into an index-only scan.
+CREATE INDEX IF NOT EXISTS idx_profiles_user_id_role
+  ON public.profiles(user_id, role);
+
+-- Composite: covers the calendar month query ORDER BY time without a separate sort step.
+CREATE INDEX IF NOT EXISTS idx_events_date_time
+  ON public.events(date, time);
+
+-- Composite: covers the dashboard deadline query (category IN (...) AND date >= X).
+CREATE INDEX IF NOT EXISTS idx_events_category_date
+  ON public.events(category, date);
+
+-- Composite: covers notification bell queries (user_id + read status filter).
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read
+  ON public.notifications(user_id, read);
+
 -- ================================================
 -- MIGRATION: Add email column to profiles (safe for existing DBs)
 -- ================================================

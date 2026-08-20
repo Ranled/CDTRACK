@@ -22,6 +22,14 @@ interface Event {
   status: string
 }
 
+// Lean type for the progress/stats query — only fetches these 4 columns
+interface EventStats {
+  id: string
+  status: string
+  priority: string
+  date: string
+}
+
 interface Announcement {
   id: string
   title: string
@@ -56,10 +64,12 @@ function ProgressRing({ percent, size = 140, strokeWidth = 10 }: ProgressRingPro
 }
 
 // In-memory module cache to prevent spinner flashes on tab navigation
+// TTL: 5 minutes — stale data older than this triggers a background re-fetch
+const CACHE_TTL_MS = 5 * 60 * 1000
 let cachedDashboardData: {
   todayEvents: Event[]
   upcomingDeadlines: Event[]
-  allEvents: Event[]
+  allEvents: EventStats[]
   announcements: Announcement[]
   timestamp: number
 } | null = null
@@ -70,13 +80,17 @@ export default function DashboardPage() {
 
   const [todayEvents, setTodayEvents] = useState<Event[]>(() => cachedDashboardData?.todayEvents || [])
   const [upcomingDeadlines, setUpcomingDeadlines] = useState<Event[]>(() => cachedDashboardData?.upcomingDeadlines || [])
-  const [allEvents, setAllEvents] = useState<Event[]>(() => cachedDashboardData?.allEvents || [])
+  const [allEvents, setAllEvents] = useState<EventStats[]>(() => cachedDashboardData?.allEvents || [])
   const [announcements, setAnnouncements] = useState<Announcement[]>(() => cachedDashboardData?.announcements || [])
   const [loading, setLoading] = useState(() => !cachedDashboardData)
 
   const fetchData = useCallback(async () => {
-    // Only show full loading spinner if we don't have any cached data
-    if (!cachedDashboardData) {
+    // Honour TTL: treat cache as invalid if older than 5 minutes
+    const isCacheValid = cachedDashboardData &&
+      (Date.now() - cachedDashboardData.timestamp < CACHE_TTL_MS)
+
+    // Only show full loading spinner if we don't have any fresh cached data
+    if (!isCacheValid) {
       setLoading(true)
     }
     const today = format(new Date(), 'yyyy-MM-dd')
@@ -85,7 +99,13 @@ export default function DashboardPage() {
       const [eventsRes, deadlinesRes, allEventsRes, announcementsRes] = await Promise.all([
         supabase.from('events').select('*').eq('date', today).order('time', { ascending: true }),
         supabase.from('events').select('*').in('category', ['deadline', 'exam', 'assignment']).gte('date', today).order('date', { ascending: true }).limit(5),
-        supabase.from('events').select('*').gte('date', format(new Date(Date.now() - 30 * 86400000), 'yyyy-MM-dd')),
+        // Only fetch columns needed for progress ring + stat cards — avoids SELECT *
+        // growing unboundedly as description/location fields accumulate over semesters
+        supabase
+          .from('events')
+          .select('id, status, priority, date')
+          .gte('date', format(new Date(Date.now() - 30 * 86400000), 'yyyy-MM-dd'))
+          .limit(500),
         supabase.from('announcements').select('*').order('is_pinned', { ascending: false }).order('created_at', { ascending: false }).limit(3),
       ])
 
