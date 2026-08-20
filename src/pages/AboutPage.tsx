@@ -26,7 +26,7 @@ export default function AboutPage() {
           <p className="text-muted-foreground text-sm mt-1">Academic Excellence Through Technology</p>
         </div>
         <p className="text-sm text-muted-foreground leading-relaxed max-w-xl mx-auto">
-          Code Dreamers is a student section led by Mayor and Former Governor <span className="text-foreground font-medium">Raian Lee D. Vallejo</span>, Former Mayor <span className="text-foreground font-medium">John Louie S. Castillon</span>, and Former Mayor <span className="text-foreground font-medium">Jhona Mae R. Tayco</span> — a section dedicated to fostering excellence in technology, programming, and academic achievement. We want to dream big, code smarter, and grow together as a community.
+          Code Dreamers is a BSCS section led by Mayor and Former Governor <span className="text-foreground font-medium">Raian Lee D. Vallejo</span>, Former Mayor <span className="text-foreground font-medium">John Louie S. Castillon</span>, and Former Mayor <span className="text-foreground font-medium">Jhona Mae R. Tayco</span> — a section dedicated to fostering excellence in technology, programming, and academic achievement. We want to dream big, code smarter, and grow together as a community.
         </p>
       </div>
 
