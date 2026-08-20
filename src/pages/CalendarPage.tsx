@@ -13,6 +13,7 @@ import {
 } from 'date-fns'
 import { cn, CATEGORY_COLORS, CATEGORY_DOT_COLORS, ALL_CATEGORIES, getPriorityColor, formatTime } from '@/lib/utils'
 import EventForm from '@/components/calendar/EventForm'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 
 export interface CalEvent {
   id: string
@@ -109,6 +110,7 @@ export default function CalendarPage() {
   const [selectedEvent, setSelectedEvent] = useState<CalEvent | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [editingEvent, setEditingEvent] = useState<CalEvent | null>(null)
+  const [deletingEvent, setDeletingEvent] = useState<CalEvent | null>(null)
   const [activeFilters, setActiveFilters] = useState<string[]>(() => urlFilter ? [urlFilter] : [])
   const [showFilters, setShowFilters] = useState(() => Boolean(urlFilter))
   const [loading, setLoading] = useState(true)
@@ -177,11 +179,14 @@ export default function CalendarPage() {
     )
   }, [])
 
-  const handleDeleteEvent = useCallback(async (id: string) => {
-    setSelectedEvent(null)
-    setEvents(prev => prev.filter(e => e.id !== id))
-    await supabase.from('events').delete().eq('id', id)
-  }, [])
+  const handleDeleteEvent = useCallback(async (eventToDelete: CalEvent) => {
+    setDeletingEvent(null)
+    if (selectedEvent?.id === eventToDelete.id) {
+      setSelectedEvent(null)
+    }
+    setEvents(prev => prev.filter(e => e.id !== eventToDelete.id))
+    await supabase.from('events').delete().eq('id', eventToDelete.id)
+  }, [selectedEvent])
 
   const handleEventClick = useCallback((event: CalEvent) => setSelectedEvent(event), [])
 
@@ -375,7 +380,7 @@ export default function CalendarPage() {
                         <Edit2 className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => handleDeleteEvent(selectedEvent.id)}
+                        onClick={() => setDeletingEvent(selectedEvent)}
                         className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-muted-foreground hover:text-red-600 transition-colors"
                         title="Delete event"
                       >
@@ -502,6 +507,16 @@ export default function CalendarPage() {
           onSave={handleFormSave}
         />
       )}
+
+      {/* Admin Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingEvent)}
+        title="Delete Event"
+        itemName={deletingEvent?.title}
+        message="Are you sure you want to permanently delete this event from the calendar?"
+        onConfirm={() => { if (deletingEvent) handleDeleteEvent(deletingEvent) }}
+        onCancel={() => setDeletingEvent(null)}
+      />
     </div>
   )
 }

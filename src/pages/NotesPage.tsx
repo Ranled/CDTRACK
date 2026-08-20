@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { cn, NOTE_COLORS, truncate } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 
 export interface Note {
   id: string
@@ -387,11 +388,17 @@ export default function NotesPage() {
     }
   }
 
+  const [deletingNote, setDeletingNote] = useState<Note | null>(null)
+
   // Delete is strictly Admin-only
-  const handleDelete = async (id: string) => {
+  const confirmDeleteNote = async (noteToDelete: Note) => {
     if (!isAdmin) return
-    setNotes(prev => prev.filter(n => n.id !== id))
-    await supabase.from('notes').delete().eq('id', id)
+    setDeletingNote(null)
+    if (viewingNote?.id === noteToDelete.id) {
+      setViewingNote(null)
+    }
+    setNotes(prev => prev.filter(n => n.id !== noteToDelete.id))
+    await supabase.from('notes').delete().eq('id', noteToDelete.id)
   }
 
   const togglePin = async (note: Note) => {
@@ -505,7 +512,7 @@ export default function NotesPage() {
                       {/* Delete (STRICTLY ADMIN ONLY) */}
                       {isAdmin && (
                         <button
-                          onClick={() => handleDelete(note.id)}
+                          onClick={() => setDeletingNote(note)}
                           className="p-1 rounded hover:bg-red-500/20 transition-colors text-red-600"
                           title="Delete (Admin only)"
                         >
@@ -552,7 +559,7 @@ export default function NotesPage() {
           isAdmin={isAdmin}
           canEdit={Boolean(canEditNote(viewingNote))}
           onEdit={() => { setViewingNote(null); openEdit(viewingNote) }}
-          onDelete={isAdmin ? () => { setViewingNote(null); handleDelete(viewingNote.id) } : undefined}
+          onDelete={isAdmin ? () => setDeletingNote(viewingNote) : undefined}
         />
       )}
 
@@ -565,6 +572,16 @@ export default function NotesPage() {
           isAdmin={isAdmin}
         />
       )}
+
+      {/* Admin Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingNote)}
+        title="Delete Note"
+        itemName={deletingNote?.title}
+        message="Are you sure you want to permanently delete this note from the class board?"
+        onConfirm={() => { if (deletingNote) confirmDeleteNote(deletingNote) }}
+        onCancel={() => setDeletingNote(null)}
+      />
     </div>
   )
 }

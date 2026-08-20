@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format, parseISO } from 'date-fns'
+import ConfirmDeleteModal from '@/components/ui/ConfirmDeleteModal'
 
 export interface Announcement {
   id: string
@@ -458,10 +459,15 @@ export default function AnnouncementsPage() {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    // Optimistic delete
-    setAnnouncements(prev => prev.filter(a => a.id !== id))
-    await supabase.from('announcements').delete().eq('id', id)
+  const [deletingItem, setDeletingItem] = useState<Announcement | null>(null)
+
+  const confirmDeleteAnnouncement = async (itemToDelete: Announcement) => {
+    setDeletingItem(null)
+    if (viewingItem?.id === itemToDelete.id) {
+      setViewingItem(null)
+    }
+    setAnnouncements(prev => prev.filter(a => a.id !== itemToDelete.id))
+    await supabase.from('announcements').delete().eq('id', itemToDelete.id)
   }
 
   const togglePin = async (ann: Announcement) => {
@@ -581,7 +587,7 @@ export default function AnnouncementsPage() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDelete(ann.id)}
+                      onClick={() => setDeletingItem(ann)}
                       className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950 text-muted-foreground hover:text-red-600 transition-colors"
                       title="Delete"
                     >
@@ -602,7 +608,7 @@ export default function AnnouncementsPage() {
           onClose={() => setViewingItem(null)}
           isAdmin={isAdmin}
           onEdit={isAdmin ? () => { setViewingItem(null); openEdit(viewingItem) } : undefined}
-          onDelete={isAdmin ? () => { setViewingItem(null); handleDelete(viewingItem.id) } : undefined}
+          onDelete={isAdmin ? () => setDeletingItem(viewingItem) : undefined}
         />
       )}
 
@@ -614,6 +620,16 @@ export default function AnnouncementsPage() {
           onSave={handleSaveAnnouncement}
         />
       )}
+
+      {/* Admin Delete Confirmation Modal */}
+      <ConfirmDeleteModal
+        isOpen={Boolean(deletingItem)}
+        title="Delete Announcement"
+        itemName={deletingItem?.title}
+        message="Are you sure you want to permanently delete this announcement? This action cannot be undone."
+        onConfirm={() => { if (deletingItem) confirmDeleteAnnouncement(deletingItem) }}
+        onCancel={() => setDeletingItem(null)}
+      />
     </div>
   )
 }

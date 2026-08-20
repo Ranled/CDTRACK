@@ -302,17 +302,7 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 sm:gap-2 ml-auto flex-shrink-0">
-        {/* Dark / Light Mode Switch */}
-        <button
-          onClick={toggleTheme}
-          className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all duration-150 flex items-center justify-center flex-shrink-0"
-          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {theme === 'dark' ? <Sun className="w-[18px] h-[18px] text-amber-500" /> : <Moon className="w-[18px] h-[18px]" />}
-        </button>
-
-        {/* 1-CLICK EASY INSTALL BUTTON — ALWAYS VISIBLE BESIDE DARK/LIGHT MODE */}
+        {/* 1-CLICK EASY INSTALL BUTTON — MOVED TO THE LEFT SIDE OF NIGHT MODE */}
         {!isInstalled && (
           <button
             onClick={handleInstallClick}
@@ -323,6 +313,16 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
             <span className="hidden sm:inline">Install</span>
           </button>
         )}
+
+        {/* Dark / Light Mode Switch */}
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-all duration-150 flex items-center justify-center flex-shrink-0"
+          title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? <Sun className="w-[18px] h-[18px] text-amber-500" /> : <Moon className="w-[18px] h-[18px]" />}
+        </button>
 
         {/* Notifications */}
         <div ref={notifRef} className="relative flex-shrink-0">
