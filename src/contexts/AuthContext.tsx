@@ -5,14 +5,16 @@ import type { User, Session } from '@supabase/supabase-js'
 // Shared access codes
 const ADMIN_CODE = 'CDADMIN01'
 const USER_CODE = 'CD01'
+const VIEWER_CODE = 'RLV0812'
+
+export type UserRole = 'admin' | 'user' | 'viewer'
 
 // Each code maps to a single shared Supabase account
 const CODE_CREDENTIALS: Record<string, { email: string; password: string; role: UserRole; displayName: string }> = {
-  [USER_CODE]:  { email: 'cd01@cdtrack.local',      password: 'cdtrack-cd01-shared',      role: 'user',  displayName: 'CD Member' },
-  [ADMIN_CODE]: { email: 'cdadmin01@cdtrack.local',  password: 'cdtrack-cdadmin01-shared', role: 'admin', displayName: 'CD Admin'  },
+  [USER_CODE]:   { email: 'cd01@cdtrack.local',      password: 'cdtrack-cd01-shared',      role: 'user',   displayName: 'CD Member' },
+  [ADMIN_CODE]:  { email: 'cdadmin01@cdtrack.local',  password: 'cdtrack-cdadmin01-shared', role: 'admin',  displayName: 'CD Admin'  },
+  [VIEWER_CODE]: { email: 'rlv0812@cdtrack.local',   password: 'cdtrack-rlv0812-shared',   role: 'viewer', displayName: 'Guest Viewer' },
 }
-
-export type UserRole = 'admin' | 'user'
 
 export interface Profile {
   id?: string
@@ -29,6 +31,7 @@ interface AuthContextType {
   profile: Profile | null
   role: UserRole | null
   isAdmin: boolean
+  isViewer: boolean
   isLoading: boolean
   signInWithCode: (code: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
@@ -45,16 +48,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const getRoleForUser = (u: User | null): UserRole => {
     if (u?.email === 'cdadmin01@cdtrack.local') return 'admin'
+    if (u?.email === 'rlv0812@cdtrack.local') return 'viewer'
     return 'user'
   }
 
   const fetchProfile = useCallback(async (userId: string, userObj?: User | null) => {
-    // Use the passed-in userObj exclusively — never the outer 'user' state.
-    // This keeps fetchProfile referentially stable (empty dep array),
-    // which prevents onAuthStateChange from being re-registered on every login.
     const targetEmail = userObj?.email
-    const expectedRole: UserRole = targetEmail === 'cdadmin01@cdtrack.local' ? 'admin' : 'user'
-    const expectedName = expectedRole === 'admin' ? 'CD Admin' : 'CD Member'
+    const expectedRole: UserRole =
+      targetEmail === 'cdadmin01@cdtrack.local'
+        ? 'admin'
+        : targetEmail === 'rlv0812@cdtrack.local'
+        ? 'viewer'
+        : 'user'
+    const expectedName =
+      expectedRole === 'admin'
+        ? 'CD Admin'
+        : expectedRole === 'viewer'
+        ? 'Guest Viewer'
+        : 'CD Member'
 
     try {
       const { data, error } = await supabase
@@ -66,8 +77,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!error && data) {
         // If the role in DB doesn't match the required code role, auto-fix it
         if (data.role !== expectedRole) {
-          await supabase.from('profiles').update({ role: expectedRole }).eq('user_id', userId)
+          await supabase.from('profiles').update({ role: expectedRole, display_name: expectedName }).eq('user_id', userId)
           data.role = expectedRole
+          data.display_name = expectedName
         }
         setProfile(data as Profile)
         return data
@@ -92,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setProfile(fallbackProfile)
       return fallbackProfile
     }
-  }, [])  // ✔ Stable reference: no outer state captured — onAuthStateChange registers once
+  }, [])
 
   const refreshProfile = useCallback(async () => {
     if (user) await fetchProfile(user.id, user)
@@ -124,23 +136,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [fetchProfile])
 
-  // Universal sign-in: just the access code
+  // Universal sign-in: supports CDADMIN01, CD01, and RLV0812
   const signInWithCode = async (code: string): Promise<{ error: string | null }> => {
-    const creds = CODE_CREDENTIALS[code]
+    const creds = CODE_CREDENTIALS[code.trim().toUpperCase()]
     if (!creds) return { error: 'Invalid access code. Please check and try again.' }
 
-    const { data, error } = await supabase.auth.signInWithPassword({
+    // First try sign-in
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email: creds.email,
       password: creds.password,
     })
 
-    if (error) {
-      return { error: `Sign-in error: ${error.message}. Please verify the account is created in Supabase.` }
+    let activeUser = signInData?.user ?? null
+
+    // Auto-provision user account on Supabase if it doesn't exist yet!
+    if (signInError && signInError.message.toLowerCase().includes('invalid login credentials')) {
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email: creds.email,
+        password: creds.password,
+        options: {
+          data: {
+            display_name: creds.displayName,
+            role: creds.role,
+          }
+        }
+      })
+      if (!signUpError && signUpData?.user) {
+        activeUser = signUpData.user
+      } else if (signUpError) {
+        return { error: `Sign-in error: ${signUpError.message}.` }
+      }
+    } else if (signInError) {
+      return { error: `Sign-in error: ${signInError.message}.` }
     }
 
-    if (data.user) {
-      setUser(data.user)
-      await fetchProfile(data.user.id, data.user)
+    if (activeUser) {
+      setUser(activeUser)
+      await fetchProfile(activeUser.id, activeUser)
     }
     return { error: null }
   }
@@ -153,12 +185,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const activeRole: UserRole = profile?.role || getRoleForUser(user)
   const isAdmin = activeRole === 'admin' || user?.email === 'cdadmin01@cdtrack.local'
+  const isViewer = activeRole === 'viewer' || user?.email === 'rlv0812@cdtrack.local'
 
   return (
     <AuthContext.Provider value={{
       user, session, profile,
       role: activeRole,
       isAdmin,
+      isViewer,
       isLoading,
       signInWithCode, signOut, refreshProfile,
     }}>

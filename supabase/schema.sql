@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
   display_name TEXT NOT NULL DEFAULT 'Member',
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user')),
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'user', 'viewer')),
   email TEXT,
   avatar_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
@@ -210,13 +210,21 @@ CREATE POLICY "notes_read_all" ON public.notes
 
 DROP POLICY IF EXISTS "notes_insert_authenticated" ON public.notes;
 CREATE POLICY "notes_insert_authenticated" ON public.notes
-  FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+  FOR INSERT WITH CHECK (
+    auth.role() = 'authenticated'
+    AND EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE user_id = auth.uid() AND role IN ('admin', 'user')
+    )
+  );
 
 DROP POLICY IF EXISTS "notes_update" ON public.notes;
 CREATE POLICY "notes_update" ON public.notes
   FOR UPDATE USING (
     EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role = 'admin')
-    OR auth.uid() = user_id
+    OR (auth.uid() = user_id AND EXISTS (
+      SELECT 1 FROM public.profiles WHERE user_id = auth.uid() AND role IN ('admin', 'user')
+    ))
   );
 
 DROP POLICY IF EXISTS "notes_delete_admin" ON public.notes;

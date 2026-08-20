@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Search, Bell, Sun, Moon, Menu, X, CheckCheck, Download, Share,
-  Smartphone, Laptop, CheckCircle2, Sparkles, ArrowRight
+  Smartphone, Laptop, CheckCircle2, Sparkles, ArrowRight, Eye
 } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
@@ -173,7 +173,7 @@ function InstallModal({ onClose, onTriggerInstall, canInstall, isIOS }: InstallM
 // ─── MAIN TOPNAV COMPONENT ────────────────────────────────────────────────
 export default function TopNav({ onMenuToggle }: TopNavProps) {
   const { theme, toggleTheme } = useTheme()
-  const { user } = useAuth()
+  const { user, isViewer } = useAuth()
   const navigate = useNavigate()
   const [showNotifs, setShowNotifs] = useState(false)
   const [showInstallModal, setShowInstallModal] = useState(false)
@@ -282,8 +282,13 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
       </button>
 
       {/* Current month */}
-      <div className="hidden md:block flex-shrink-0">
+      <div className="hidden md:flex items-center gap-2 flex-shrink-0">
         <span className="text-sm font-semibold text-foreground">{currentMonth}</span>
+        {isViewer && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 flex-shrink-0">
+            <Eye className="w-3 h-3" /> View Only
+          </span>
+        )}
       </div>
 
       {/* Global Search */}

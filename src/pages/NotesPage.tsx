@@ -332,7 +332,7 @@ function NoteModal({ note, onClose, onSave, isAdmin }: NoteModalProps) {
 
 // ─── MAIN NOTES PAGE ───────────────────────────────────────────────────────
 export default function NotesPage() {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, isViewer } = useAuth()
   const [notes, setNotes]             = useState<Note[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal]     = useState(false)
@@ -365,15 +365,23 @@ export default function NotesPage() {
     )
   }, [notes, searchQuery])
 
-  // Both Admin & Member can create notes
-  const openCreate = () => { setEditingNote(null); setShowModal(true) }
+  // Both Admin & Member can create notes (viewers cannot)
+  const openCreate = () => {
+    if (isViewer) return
+    setEditingNote(null)
+    setShowModal(true)
+  }
   
-  // Can edit if admin or author
-  const canEditNote = (note: Note) => isAdmin || (user && user.id === note.user_id)
-  const openEdit    = (note: Note) => { setEditingNote(note); setShowModal(true) }
+  // Can edit if admin or author (viewers cannot)
+  const canEditNote = (note: Note) => !isViewer && (isAdmin || (user && user.id === note.user_id))
+  const openEdit    = (note: Note) => {
+    if (isViewer) return
+    setEditingNote(note)
+    setShowModal(true)
+  }
 
   const handleSaveNote = async (data: { title: string; content: string; color: string; pinned: boolean }) => {
-    if (!user) return
+    if (!user || isViewer) return
     const payload = { user_id: user.id, title: data.title, content: data.content, color: data.color, pinned: data.pinned }
 
     if (editingNote) {
@@ -420,18 +428,22 @@ export default function NotesPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Class Notes</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Shared notes board · all members can add notes · only admins can delete notes
+            {isViewer
+              ? 'Shared class notes · viewing in read-only mode'
+              : 'Shared notes board · all members can add notes · only admins can delete notes'}
           </p>
         </div>
 
-        {/* "New Note" Button is now visible to ALL users (Admin & Member) */}
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 shadow-sm"
-        >
-          <Plus className="w-4 h-4" />
-          New Note
-        </button>
+        {/* "New Note" Button is visible to Admin & Member (hidden for Viewer) */}
+        {!isViewer && (
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-700 active:scale-[0.98] transition-all duration-150 shadow-sm"
+          >
+            <Plus className="w-4 h-4" />
+            New Note
+          </button>
+        )}
       </div>
 
       {/* Search */}

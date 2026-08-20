@@ -88,9 +88,9 @@ export default function Sidebar({ mobileOpen, onMobileClose }: SidebarProps) {
             <div className="text-xs font-medium text-foreground truncate">{profile.display_name}</div>
             <div className={cn(
               'text-[10px] font-medium mt-0.5',
-              isAdmin ? 'text-primary' : 'text-muted-foreground'
+              isAdmin ? 'text-primary' : profile.role === 'viewer' ? 'text-amber-500 font-semibold' : 'text-muted-foreground'
             )}>
-              {isAdmin ? 'Administrator' : 'Member'}
+              {isAdmin ? 'Administrator' : profile.role === 'viewer' ? 'Viewer (Read-Only)' : 'Member'}
             </div>
           </div>
         )}
