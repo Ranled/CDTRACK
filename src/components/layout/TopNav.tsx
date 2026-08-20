@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, Bell, Sun, Moon, Menu, X, CheckCheck } from 'lucide-react'
+import { Search, Bell, Sun, Moon, Menu, X, CheckCheck, Download, Share } from 'lucide-react'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { cn, formatDate } from '@/lib/utils'
 import { format } from 'date-fns'
+import { useInstallPrompt } from '@/hooks/useInstallPrompt'
 
 interface Notification {
   id: string
@@ -28,7 +29,10 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [searchQuery, setSearchQuery] = useState('')
+  const [showIOSTip, setShowIOSTip] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
+  const installRef = useRef<HTMLDivElement>(null)
+  const { canInstall, isIOS, isInstalled, triggerInstall } = useInstallPrompt()
 
   const currentMonth = format(new Date(), 'MMMM yyyy')
 
@@ -75,6 +79,9 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
     const handleClickOutside = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setShowNotifs(false)
+      }
+      if (installRef.current && !installRef.current.contains(e.target as Node)) {
+        setShowIOSTip(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -149,6 +156,44 @@ export default function TopNav({ onMenuToggle }: TopNavProps) {
         >
           {theme === 'dark' ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
         </button>
+
+        {/* Install App button — auto-hides when already installed or not installable */}
+        {!isInstalled && (canInstall || isIOS) && (
+          <div ref={installRef} className="relative">
+            <button
+              onClick={isIOS ? () => setShowIOSTip(v => !v) : triggerInstall}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:opacity-90 active:scale-[0.97] transition-all duration-150"
+              title="Install CD TRACK"
+            >
+              {isIOS
+                ? <Share className="w-3.5 h-3.5" />
+                : <Download className="w-3.5 h-3.5" />}
+              <span className="hidden sm:inline">Install</span>
+            </button>
+
+            {/* iOS manual-instruction tooltip */}
+            {isIOS && showIOSTip && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-background border border-border rounded-xl shadow-panel p-4 z-50 animate-scale-in">
+                <p className="text-xs font-semibold text-foreground mb-2">Add to Home Screen</p>
+                <ol className="text-xs text-muted-foreground space-y-2 list-none">
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">1</span>
+                    Tap the <Share className="w-3.5 h-3.5 inline mx-1 text-blue-500" /> Share button at the bottom of Safari
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">2</span>
+                    Scroll down and tap <strong className="text-foreground">"Add to Home Screen"</strong>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold flex items-center justify-center flex-shrink-0 mt-0.5">3</span>
+                    Tap <strong className="text-foreground">"Add"</strong> — done!
+                  </li>
+                </ol>
+                <p className="text-[10px] text-muted-foreground/60 mt-3">Must be opened in Safari (not Chrome) on iOS.</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Notifications */}
         <div ref={notifRef} className="relative">
